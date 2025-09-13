@@ -1,6 +1,7 @@
 / {
     aliases {
         can0 = &can_over_spi;
+        sdhc0 = &sdhc_card;
     };
 
     chosen {
@@ -10,8 +11,9 @@
 
 &spi3 {
     // add chip select for can board at gpio 45
-    cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>, // preexisting lora cs
-            <&gpio1 13 GPIO_ACTIVE_LOW>; // GPIO 45 == GPIO1 13
+    cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
+            <&gpio1 13 GPIO_ACTIVE_LOW>,    // GPIO 45 == GPIO1 13 can
+            <&gpio0 4 GPIO_ACTIVE_LOW>;     // SD card
 
     can_over_spi: can@1 {
         compatible = "microchip,mcp2515";
@@ -19,5 +21,11 @@
         osc-freq = <DT_FREQ_M(8)>;
         int-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>; // GPIO 46 == GPIO1 14
         spi-max-frequency = <DT_FREQ_M(4)>; // might be wrong, just a guess
-    };  
+    }; 
+
+    sdhc_card: sdhc@2 {
+        compatible = "zephyr,sdhc-spi-slot";
+        reg = <2>;
+        spi-max-frequency = <DT_FREQ_M(4)>;
+    };
 };
