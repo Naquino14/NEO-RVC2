@@ -40,39 +40,40 @@ static bool init_common()
     printk("#           CFG INIT           #\n");
     printk("%s\n", HASHES);
 
+    bool rdy = true;
+
     if (!device_is_ready(led.port)) {
         LOG_ERR("LED device is not ready");
-        return false;
+        rdy = false;
     }
 
     LOG_INF("LED\t\tRDY");
     
     if (!device_is_ready(sw0.port)) {
         LOG_ERR("User switch device is not ready");
-        return false;
+        rdy = false;
     }
     LOG_INF("User switch\tRDY");
     
     if (!device_is_ready(lora)) {
         LOG_ERR("LoRa device is not ready");
-        return false;
+        rdy = false;
     }
     LOG_INF("LoRa\t\tRDY");
     
-    // skip display for now, mine is broken
-    // if (!device_is_ready(display)) {
-    //     LOG_ERR("Display device is not ready");
-    //     return false;
-    // }
-    // LOG_INF("Display\t\tRDY");
+    if (!device_is_ready(display)) {
+        LOG_ERR("Display device is not ready");
+        rdy = false;
+    }
+    LOG_INF("Display\t\tRDY");
 
     if (!device_is_ready(can)) {
         LOG_ERR("CAN device is not ready");
-        return false;
+        rdy = false;
     }
     LOG_INF("CAN\t\tRDY");
 
-    return true;
+    return rdy;
 }
 
 static bool init_fob() {
@@ -86,22 +87,21 @@ static bool init_trc() {
 bool role_config()
 {
     // config common
-    bool success = init_common();
+    bool success = true;
+
+    success &= init_common();
     if (!success)
-    {
         LOG_ERR("Role init common failed.");
-        return success;
-    }
 
     dev_role role = role_get();
 
     switch (role)
     {
     case ROLE_FOB:
-        success = init_fob();
+        success &= init_fob();
         break;
     case ROLE_TRC:
-        success = init_trc();
+        success &= init_trc();
         break;
     case ROLE_UKN:
     default:
@@ -109,6 +109,6 @@ bool role_config()
         return false;
     }
 
-    LOG_INF("Role %s configuration complete.", role_tostring());
-    return true;
+    LOG_INF("Role %s configuration %s.", role_tostring(), success ? "complete" : "incomplete");
+    return success;
 }
