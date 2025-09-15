@@ -9,7 +9,9 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/fs/fs.h>
 
+#include <ff.h>
 #include <lvgl.h>
 #include <lvgl_input_device.h>
 
@@ -160,6 +162,50 @@ static bool bit_display_st7735(bool wait_sw0)
     LOG_INF("Display\t\tOK");
     return true;
 }
+
+static FATFS sd_fs_fat_info;
+
+static struct fs_mount_t sd_mnt_info = {
+    .type = FS_FATFS,
+    .fs_data = &sd_fs_fat_info,
+    .mnt_point = "/SD:"
+};
+
+static bool bit_sdhc() {
+    // mount, read, write, check write, unmount
+    int ret = fs_mount(&sd_mnt_info);
+    if (ret < 0) 
+        return false;
+
+    struct fs_file_t tst_file;
+    k_msleep(100);
+    ret = fs_open(&tst_file, "/SD:/test.txt", FS_O_READ);
+    if (ret == ENOENT) 
+        LOG_WRN("SD could not open test.txt for reading");
+    else if (ret < 0) {
+        LOG_ERR("SD open test failed %d", ret); // this is failing with -EBUSY
+        return false;
+    } else {
+        char buf[128];
+        ssize_t read_ret = fs_read(&tst_file, buf, sizeof(buf));
+        if (read_ret < 0) {
+            LOG_ERR("SD read test file failed");
+            return false;
+        }
+        LOG_INF("%s", buf);
+
+        fs_close(&tst_file);
+    }
+
+    ret = fs_unmount(&sd_mnt_info);
+    if (ret < 0) {
+        LOG_ERR("SD unmount failed %d", ret);
+        return false;
+    }
+
+    LOG_INF("SDHC\t\tOK");
+    return true;
+}
 #endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
@@ -225,6 +271,18 @@ bool bit_display(bool wait_sw0) {
     return false;
 }
 
+bool bit_role_specific_basic() {
+    bool ok = true;
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
+#elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+    if (!bit_sdhc())
+        ok = false;
+
+#endif
+    
+    return ok;
+}
+
 bool bit_basic() {
     // run bit on:
     // led
@@ -235,6 +293,8 @@ bool bit_basic() {
     // CAN
     // sdcard
     // gps (later)
+
+    bool ok = true;
 
     const char *HASHES = "################################";
 
@@ -249,25 +309,26 @@ bool bit_basic() {
         int ret = gpio_add_callback(sw0.port, &sw0_cb_data);
         if (ret < 0) {
             printk("Failed to register SW0 callback: %d\n", ret);
-            return false;
+            ok = false;
         }
     }
 
-    if (!bit_led()) {
-        stop_bit();
-        return false;
-    }
+    ok &= bit_led();
 
-    if (!bit_lora(false)) {
-        stop_bit();
-        return false;
-    }
+    ok &= bit_lora(false);
     
-    if (!bit_display(false))
-        return false;
+    ok &= bit_display(false);
 
+    // device specific BIT
+    ok &= bit_role_specific_basic();
+
+    if (!ok) 
+        LOG_ERR("BIT errors have occured");
+    
+    stop_bit();
     LOG_INF("BIT %s complete.", role_tostring());
-    return true;
+
+    return ok;
 }
 
 void run_bit() {

@@ -120,6 +120,7 @@ bool role_config()
     switch (role)
     {
     case ROLE_FOB:
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
         success &= init_fob();
 #endif
         break;
