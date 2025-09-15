@@ -121,6 +121,7 @@ bool role_config()
     {
     case ROLE_FOB:
         success &= init_fob();
+#endif
         break;
     case ROLE_TRC:
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
