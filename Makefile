@@ -31,5 +31,8 @@ mon:
 menuconfig:
 	west build -t menuconfig
 
+clean:
+	rm -rf build/
+
 show:
 	@echo CWD: $(CWD)
