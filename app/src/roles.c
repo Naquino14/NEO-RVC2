@@ -26,6 +26,7 @@ const struct gpio_dt_spec blight;
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 #define DISPLAY_NODE DT_NODELABEL(st7735)
 const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
+
 #define BLIGHT_NODE DT_ALIAS(blight)
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 
@@ -80,9 +81,30 @@ static bool init_fob() {
     return true;
 }
 
-static bool init_trc() {
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+
+static bool init_trc_sdhc() {
+    const char* disk_pdrv = "SD";
+
+    int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
+    if (ret < 0) {
+        LOG_ERR("SD card init failed: storage init error %d", ret);
+        return false;
+    }
+    LOG_INF("SDHC\t\tRDY");
+
     return true;
 }
+
+static bool init_trc() {
+    bool rdy = true;
+
+    rdy &= init_trc_sdhc();
+
+    return rdy;
+}
+
+#endif
 
 bool role_config()
 {
@@ -101,7 +123,9 @@ bool role_config()
         success &= init_fob();
         break;
     case ROLE_TRC:
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
         success &= init_trc();
+#endif
         break;
     case ROLE_UKN:
     default:

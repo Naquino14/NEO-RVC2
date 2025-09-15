@@ -18,6 +18,7 @@
     can_over_spi: can@1 {
         compatible = "microchip,mcp2515";
         reg = <1>;
+        status = "okay";
         osc-freq = <DT_FREQ_M(8)>;
         int-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>; // GPIO 46 == GPIO1 14
         spi-max-frequency = <DT_FREQ_M(4)>; // might be wrong, just a guess
@@ -26,6 +27,12 @@
     sdhc_card: sdhc@2 {
         compatible = "zephyr,sdhc-spi-slot";
         reg = <2>;
-        spi-max-frequency = <DT_FREQ_M(4)>;
+        status = "okay";
+        mmc {
+            compatible = "zephyr,sdmmc-disk";
+            disk-name = "SD";
+            status = "okay";
+        };
+        spi-max-frequency = <DT_FREQ_M(25)>;
     };
 };
