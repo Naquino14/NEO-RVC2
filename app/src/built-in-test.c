@@ -178,25 +178,65 @@ static bool bit_sdhc() {
         return false;
 
     struct fs_file_t tst_file;
+    fs_file_t_init(&tst_file);
     k_msleep(100);
-    ret = fs_open(&tst_file, "/SD:/test.txt", FS_O_READ);
-    if (ret == ENOENT) 
-        LOG_WRN("SD could not open test.txt for reading");
+    const char* test_path = "/SD:/bit.txt";
+    ret = fs_open(&tst_file, test_path, FS_O_CREATE | FS_O_RDWR);
+    if (ret == -ENOENT) 
+        LOG_WRN("SD could not open bit.txt for writing");
     else if (ret < 0) {
-        LOG_ERR("SD open test failed %d", ret); // this is failing with -EBUSY
+        LOG_ERR("SD open test failed %d", ret); 
         return false;
-    } else {
-        char buf[128];
-        ssize_t read_ret = fs_read(&tst_file, buf, sizeof(buf));
-        if (read_ret < 0) {
-            LOG_ERR("SD read test file failed");
-            return false;
-        }
-        LOG_INF("%s", buf);
-
-        fs_close(&tst_file);
+    }
+    
+    const char write_buf[11] = "SDHC\t\tOK?\n";
+    ssize_t read_ret = fs_write(&tst_file, write_buf, sizeof(write_buf));
+    if (read_ret < 0) {
+        LOG_ERR("SD write test file failed");
+        return false;
     }
 
+    ret = fs_close(&tst_file);
+    if (ret < 0) {
+        LOG_ERR("SD close written test file failed");
+        return false;
+    }
+
+    k_msleep(10);
+    fs_file_t_init(&tst_file);
+    ret = fs_open(&tst_file, test_path, FS_O_READ);
+    if (ret < 0) {
+        LOG_ERR("SD open test file for read failed %d", ret);
+        return false;
+    }
+
+    char read_buf[sizeof(write_buf)];
+    read_ret = fs_read(&tst_file, read_buf, sizeof(read_buf));
+    if (read_ret < 0) {
+        LOG_ERR("SD read test file failed %d", read_ret);
+        return false;
+    }
+
+    ret = fs_close(&tst_file);
+    if (ret < 0) {
+        LOG_ERR("SD close read test file failed");
+        return false;
+    }
+
+    ret = strncmp(read_buf, write_buf, sizeof(read_buf));
+    if (ret != 0) {
+        LOG_ERR("SD read/write data mismatch");
+        return false;
+    }
+
+    // delete test file
+    ret = fs_unlink(test_path);
+    if (ret < 0) { 
+        LOG_ERR("SD delete test file failed %d", ret);
+        return false;
+    }
+
+    k_msleep(100);
     ret = fs_unmount(&sd_mnt_info);
     if (ret < 0) {
         LOG_ERR("SD unmount failed %d", ret);
