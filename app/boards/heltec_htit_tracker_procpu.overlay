@@ -2,6 +2,7 @@
     aliases {
         can0 = &can_over_spi;
         sdhc0 = &sdhc_card;
+        i2s-tx = &i2s0;
     };
 
     chosen {
@@ -9,11 +10,37 @@
     };
 };
 
+&pinctrl {
+    i2s_default: i2s_default {
+        group1 {
+            pinmux = <I2S0_O_WS_GPIO6>, // set output WS pin
+                    <I2S0_O_BCK_GPIO5>, // set outpit BCK pin
+                    <I2S0_O_SD_GPIO4>; // set output SD pin
+        };
+
+        group2 {
+            pinmux = <I2S0_I_SD_GPIO7>;
+        };
+    };
+};
+
+&i2s0 {
+    status = "okay";
+    pinctrl-0 = <&i2s_default>;
+    pinctrl-names = "default";
+
+    dmas = <&dma 3>;
+    dma-names = "tx";
+};
+
+&dma {
+    status = "okay";
+};
+
 &spi3 {
-    // add chip select for can board at gpio 45
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
-            <&gpio1 13 GPIO_ACTIVE_LOW>,    // GPIO 45 == GPIO1 13 can
-            <&gpio0 4 GPIO_ACTIVE_LOW>;     // SD card
+            <&gpio1 13 GPIO_ACTIVE_LOW>,    // CAN module GPIO 45 == GPIO1 13
+            <&gpio1 14 GPIO_ACTIVE_LOW>;     // SD card GPIO46 == GPIO1 14
 
     can_over_spi: can@1 {
         compatible = "microchip,mcp2515";
