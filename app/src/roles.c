@@ -30,6 +30,9 @@ const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
 #define BLIGHT_NODE DT_ALIAS(blight)
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 
+#define I2S_NODE DT_ALIAS(i2s_tx)
+const struct device *i2s = DEVICE_DT_GET(I2S_NODE);
+
 #endif
 
 LOG_MODULE_REGISTER(roles, LOG_LEVEL_DBG);
@@ -100,6 +103,13 @@ static bool init_trc() {
     bool rdy = true;
 
     rdy &= init_trc_sdhc();
+
+    int ret = device_is_ready(i2s);
+    if (ret < 0) {
+        LOG_ERR("I2S device is not ready");
+        rdy = false;
+    }
+    LOG_INF("I2S\t\tRDY");
 
     return rdy;
 }
