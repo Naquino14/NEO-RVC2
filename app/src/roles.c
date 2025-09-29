@@ -12,26 +12,85 @@ const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
 
 #define LORA_NODE DT_NODELABEL(lora0)
-const struct device *lora = DEVICE_DT_GET(LORA_NODE);
+const struct device * const lora = DEVICE_DT_GET(LORA_NODE);
 
 #define CAN_NODE DT_CHOSEN(zephyr_canbus)
-const struct device *can = DEVICE_DT_GET(CAN_NODE);
+const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
+
 #define DISPLAY_NODE DT_NODELABEL(ssd1306)
 const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
-#define BLIGHT_NODE NULL
-const struct gpio_dt_spec blight;
+
+static const role_devs_t m_role_devs = {
+    .gpio_led0 = &led,
+    .gpio_led0_stat = DEVSTAT_NOT_RDY,
+
+    .gpio_sw0 = &sw0,
+    .gpio_sw0_stat = DEVSTAT_NOT_RDY,
+
+    .dev_lora = &lora,
+    .dev_lora_stat = DEVSTAT_NOT_RDY,
+
+    .dev_display = &display,
+    .gpio_blight = NULL,
+    .dev_display_stat = DEVSTAT_NOT_RDY,
+    .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
+
+    .dev_can0 = &can0,
+    .dev_can0_stat = DEVSTAT_NOT_RDY,
+
+    .dev_i2s = NULL,
+    .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
+
+    .dev_sdcard_mnt_info = NULL,
+    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+};
+const role_devs_t* role_devs = &m_role_devs;
 
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+
 #define DISPLAY_NODE DT_NODELABEL(st7735)
-const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
+const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
 
 #define BLIGHT_NODE DT_ALIAS(blight)
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 
 #define I2S_NODE DT_ALIAS(i2s_tx)
-const struct device *i2s = DEVICE_DT_GET(I2S_NODE);
+const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
+
+static FATFS sd_fs_fat_info;
+static const struct fs_mount_t sdcard_mnt_info = {
+    .type = FS_FATFS,
+    .fs_data = &sd_fs_fat_info,
+    .mnt_point = "/SD:"
+};
+
+static role_devs_t m_role_devs = {
+    .gpio_led0 = &led,
+    .gpio_led0_stat = DEVSTAT_NOT_RDY,
+
+    .gpio_sw0 = &sw0,
+    .gpio_sw0_stat = DEVSTAT_NOT_RDY,
+
+    .dev_lora = lora,
+    .dev_lora_stat = DEVSTAT_NOT_RDY,
+
+    .dev_display = display,
+    .gpio_blight = &blight,
+    .dev_display_stat = DEVSTAT_NOT_RDY,
+    .gpio_blight_stat = DEVSTAT_NOT_RDY,
+
+    .dev_can0 = can0,
+    .dev_can0_stat = DEVSTAT_NOT_RDY,
+
+    .dev_i2s = i2s,
+    .dev_i2s_stat = DEVSTAT_NOT_RDY,
+
+    .dev_sdcard_mnt_info = &sdcard_mnt_info,
+    .dev_sdcard_stat = DEVSTAT_NOT_RDY
+};
+role_devs_t* role_devs = &m_role_devs;
 
 #endif
 
@@ -46,35 +105,43 @@ static bool init_common()
 
     bool rdy = true;
 
-    if (!device_is_ready(led.port)) {
+    if (!device_is_ready(role_devs->gpio_led0->port)) {
         LOG_ERR("LED device is not ready");
+        role_devs->gpio_led0_stat = DEVSTAT_ERR;
         rdy = false;
     }
-
+    role_devs->gpio_led0_stat = DEVSTAT_RDY;
     LOG_INF("LED\t\tRDY");
     
-    if (!device_is_ready(sw0.port)) {
+    if (!device_is_ready(role_devs->gpio_sw0->port)) {
         LOG_ERR("User switch device is not ready");
+        role_devs->gpio_sw0_stat = DEVSTAT_ERR;
         rdy = false;
     }
+    role_devs->gpio_sw0_stat = DEVSTAT_RDY;
     LOG_INF("User switch\tRDY");
     
     if (!device_is_ready(lora)) {
         LOG_ERR("LoRa device is not ready");
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
         rdy = false;
     }
+    role_devs->dev_lora_stat = DEVSTAT_RDY;
     LOG_INF("LoRa\t\tRDY");
     
-    if (!device_is_ready(display)) {
+    if (!device_is_ready(role_devs->dev_lora)) {
         LOG_ERR("Display device is not ready");
         rdy = false;
     }
+    role_devs->dev_display_stat = DEVSTAT_RDY;
     LOG_INF("Display\t\tRDY");
 
-    if (!device_is_ready(can)) {
+    if (!device_is_ready(role_devs->dev_can0)) {
         LOG_ERR("CAN device is not ready");
+        role_devs->dev_can0_stat = DEVSTAT_ERR;
         rdy = false;
     }
+    role_devs->dev_can0_stat = DEVSTAT_RDY;
     LOG_INF("CAN\t\tRDY");
 
     return rdy;
@@ -84,16 +151,16 @@ static bool init_fob() {
     return true;
 }
 
-#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-
 static bool init_trc_sdhc() {
     const char* disk_pdrv = "SD";
 
     int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
     if (ret < 0) {
         LOG_ERR("SD card init failed: storage init error %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
+    role_devs->dev_sdcard_stat = DEVSTAT_RDY;
     LOG_INF("SDHC\t\tRDY");
 
     return true;
@@ -104,17 +171,17 @@ static bool init_trc() {
 
     rdy &= init_trc_sdhc();
 
-    int ret = device_is_ready(i2s);
+    int ret = device_is_ready(role_devs->dev_i2s);
     if (ret < 0) {
         LOG_ERR("I2S device is not ready");
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
         rdy = false;
     }
+    role_devs->dev_i2s_stat = DEVSTAT_RDY;
     LOG_INF("I2S\t\tRDY");
 
     return rdy;
 }
-
-#endif
 
 bool role_config()
 {
