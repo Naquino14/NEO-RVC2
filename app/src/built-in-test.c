@@ -46,18 +46,29 @@ static void lora_rx_cb(const struct device *dev, uint8_t* data, uint16_t len, in
 }
 
 bool bit_led() {
-    int ret = gpio_pin_set_dt(&led, true);
+    if (role_devs->gpio_led0_stat != DEVSTAT_RDY) {
+        LOG_WRN("LED0\t\tSKIP");
+        return true;
+    }
+
+    int ret = gpio_pin_set_dt(role_devs->gpio_led0, true);
     if (ret == -EIO) {
-        LOG_ERR("LED port IO err");
+        LOG_ERR("LED0 port IO err");
+        role_devs->gpio_led0_stat = DEVSTAT_ERR;
         return false;
     }
     k_msleep(10);
-    gpio_pin_set_dt(&led, false);
-    LOG_INF("LED\t\tOK");
+    gpio_pin_set_dt(role_devs->gpio_led0, false);
+    LOG_INF("LED0\t\tOK");
     return true;
 }
 
 bool bit_lora(bool call_resp) {
+    if (role_devs->dev_lora_stat != DEVSTAT_RDY) {
+        LOG_WRN("LoRa\t\tSKIP");
+        return true;
+    }
+
     lora_cfg.tx = true;
     char call[] = "PING";
     if (!call_resp)
@@ -65,15 +76,17 @@ bool bit_lora(bool call_resp) {
     else
         lora_cfg.tx_power = LORA_MAX_POW_DBM;
     
-    int ret = lora_config(lora, &lora_cfg);
+    int ret = lora_config(role_devs->dev_lora, &lora_cfg);
     if (ret < 0) {
         LOG_ERR("LoRa config failed: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
         return false;
     }
 
-    ret = lora_send(lora, call, sizeof(call));
+    ret = lora_send(role_devs->dev_lora, call, sizeof(call));
     if (ret < 0) {
         LOG_ERR("LoRa send failed: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -83,9 +96,10 @@ bool bit_lora(bool call_resp) {
         int16_t rssi;
         int8_t snr;
 
-        ret = lora_recv(lora, recv, sizeof(recv), K_MSEC(1000), &rssi, &snr);
+        ret = lora_recv(role_devs->dev_lora, recv, sizeof(recv), K_MSEC(1000), &rssi, &snr);
         if (ret < 0) {
             LOG_ERR("LoRa receive failed: %d", ret);
+            role_devs->dev_lora_stat = DEVSTAT_ERR;
             return false;
         }
 
@@ -99,11 +113,16 @@ bool bit_lora(bool call_resp) {
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 static bool bit_display_st7735(bool wait_sw0)
 {
+    if (role_devs->dev_display_stat != DEVSTAT_RDY) {
+        LOG_WRN("Display\t\tSKIP");
+        return true;
+    }
+
     int width = DT_PROP(DT_CHOSEN(zephyr_display), width);
     int height = DT_PROP(DT_CHOSEN(zephyr_display), height);
     
     struct display_capabilities capabilities;
-    display_get_capabilities(display, &capabilities);
+    display_get_capabilities(role_devs->dev_display, &capabilities);
 
     struct display_buffer_descriptor fbuf_descr = {
         .width = 1,
@@ -112,7 +131,7 @@ static bool bit_display_st7735(bool wait_sw0)
     };
 
     if (ROLE_IS_TRC) {
-        gpio_pin_set_dt(&blight, true);
+        gpio_pin_set_dt(role_devs->gpio_blight, true);
         fbuf_descr.buf_size = sizeof(uint16_t);
     } else 
         fbuf_descr.buf_size = sizeof(uint8_t);
@@ -132,14 +151,15 @@ static bool bit_display_st7735(bool wait_sw0)
                 #endif
 
                 // set pixel
-                int ret = display_write(display, x, y, &fbuf_descr, &pixel);
+                int ret = display_write(role_devs->dev_display, x, y, &fbuf_descr, &pixel);
 
                 if (ret < 0) {
                     LOG_ERR("Display write failed: %d", ret);
 
                     if (ROLE_IS_TRC)
-                        gpio_pin_set_dt(&blight, false);
+                        gpio_pin_set_dt(role_devs->gpio_blight, false);
                     
+                    role_devs->dev_display_stat = DEVSTAT_ERR;
                     return false;
                 }
             }
@@ -151,20 +171,19 @@ static bool bit_display_st7735(bool wait_sw0)
             k_msleep(1000);
 
         // clear display now 
-        display_blanking_on(display);
-        display_blanking_off(display);
+        display_blanking_on(role_devs->dev_display);
+        display_blanking_off(role_devs->dev_display);
 
     } while ((second = !second));
 
     if (ROLE_IS_TRC)
-        gpio_pin_set_dt(&blight, false);
+        gpio_pin_set_dt(role_devs->gpio_blight, false);
 
     LOG_INF("Display\t\tOK");
     return true;
 }
 
 static FATFS sd_fs_fat_info;
-
 static struct fs_mount_t sd_mnt_info = {
     .type = FS_FATFS,
     .fs_data = &sd_fs_fat_info,
@@ -172,10 +191,18 @@ static struct fs_mount_t sd_mnt_info = {
 };
 
 static bool bit_sdhc() {
+    if (role_devs->dev_sdcard_stat != DEVSTAT_RDY) {
+        LOG_WRN("SDHC\t\tSKIP");
+        return true;
+    }
+
     // mount, read, write, check write, unmount
     int ret = fs_mount(&sd_mnt_info);
-    if (ret < 0) 
+    if (ret < 0) {
+        LOG_ERR("SD fs failed to mount");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
+    }
 
     struct fs_file_t tst_file;
     fs_file_t_init(&tst_file);
@@ -185,7 +212,14 @@ static bool bit_sdhc() {
     if (ret == -ENOENT) 
         LOG_WRN("SD could not open bit.txt for writing");
     else if (ret < 0) {
-        LOG_ERR("SD open test failed %d", ret); 
+        LOG_ERR("SD open test failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        return false;
+    }
+    ret = fs_close(&tst_file);
+    if (ret < 0) {
+        LOG_ERR("SD close bit.txt file failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
     
@@ -193,12 +227,14 @@ static bool bit_sdhc() {
     ssize_t read_ret = fs_write(&tst_file, write_buf, sizeof(write_buf));
     if (read_ret < 0) {
         LOG_ERR("SD write test file failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
     ret = fs_close(&tst_file);
     if (ret < 0) {
         LOG_ERR("SD close written test file failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -207,6 +243,7 @@ static bool bit_sdhc() {
     ret = fs_open(&tst_file, test_path, FS_O_READ);
     if (ret < 0) {
         LOG_ERR("SD open test file for read failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -214,18 +251,21 @@ static bool bit_sdhc() {
     read_ret = fs_read(&tst_file, read_buf, sizeof(read_buf));
     if (read_ret < 0) {
         LOG_ERR("SD read test file failed %d", read_ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
     ret = fs_close(&tst_file);
     if (ret < 0) {
         LOG_ERR("SD close read test file failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
     ret = strncmp(read_buf, write_buf, sizeof(read_buf));
     if (ret != 0) {
         LOG_ERR("SD read/write data mismatch");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -233,6 +273,7 @@ static bool bit_sdhc() {
     ret = fs_unlink(test_path);
     if (ret < 0) { 
         LOG_ERR("SD delete test file failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -240,6 +281,7 @@ static bool bit_sdhc() {
     ret = fs_unmount(&sd_mnt_info);
     if (ret < 0) {
         LOG_ERR("SD unmount failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -250,6 +292,11 @@ static bool bit_sdhc() {
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 static bool bit_display_ssd1306(bool wait_sw0) {
+    if (role_devs->dev_display_stat != DEVSTAT_RDY) {
+        LOG_WRN("Display\t\tSKIP");
+        return true;
+    }
+
     const int width = DT_PROP(DT_CHOSEN(zephyr_display), width);
     const int height = DT_PROP(DT_CHOSEN(zephyr_display), height);
 
@@ -276,15 +323,16 @@ static bool bit_display_ssd1306(bool wait_sw0) {
 
         for (int i = 0; i < height; i += 8) {
             fbuf_descr.frame_incomplete = (height - 8) == i ? false : true;
-            int ret = display_write(display, 0, i, &fbuf_descr, fbuf);
+            int ret = display_write(role_devs->dev_display, 0, i, &fbuf_descr, fbuf);
 
             if (ret < 0) {
                 LOG_ERR("Display write failed: %d", ret);
+                role_devs->dev_display_stat = DEVSTAT_ERR;
                 return false;
             }
         }
 
-        display_blanking_off(display);
+        display_blanking_off(role_devs->dev_display);
 
         if (cnt >= 2)
             break;
@@ -303,8 +351,7 @@ static bool bit_display_ssd1306(bool wait_sw0) {
 
 bool bit_display(bool wait_sw0) {
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
-    // return bit_display_ssd1306(wait_sw0);
-    return true; // skip display BIT for fob for now
+    return bit_display_ssd1306(wait_sw0);
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
     return bit_display_st7735(wait_sw0);
 #endif
@@ -344,11 +391,14 @@ bool bit_basic() {
     printk("# Role: %-22s #\n", role_tostring());
     printk("%s\n", HASHES);
 
-    if (sw0.port) {
-        gpio_init_callback(&sw0_cb_data, button_pressed, BIT(sw0.pin));
-        int ret = gpio_add_callback(sw0.port, &sw0_cb_data);
+    if (role_devs->gpio_sw0_stat != DEVSTAT_RDY) 
+        LOG_WRN("SW0\t\tSKIP");
+    else if (role_devs->gpio_sw0->port) {
+        gpio_init_callback(&sw0_cb_data, button_pressed, BIT(role_devs->gpio_sw0->pin));
+        int ret = gpio_add_callback(role_devs->gpio_sw0->port, &sw0_cb_data);
         if (ret < 0) {
-            printk("Failed to register SW0 callback: %d\n", ret);
+            LOG_ERR("Failed to register SW0 callback: %d\n", ret);
+            role_devs->gpio_sw0_stat = DEVSTAT_ERR;
             ok = false;
         }
     }
@@ -382,28 +432,28 @@ void run_bit() {
 
     int ret;
 
-    if (sw0.port) {
+    if (role_devs->gpio_sw0->port) {
         static struct gpio_callback sw0_cb_data;
-        gpio_init_callback(&sw0_cb_data, button_pressed, BIT(sw0.pin));
-        ret = gpio_add_callback(sw0.port, &sw0_cb_data);
+        gpio_init_callback(&sw0_cb_data, button_pressed, BIT(role_devs->gpio_sw0->pin));
+        ret = gpio_add_callback(role_devs->gpio_sw0->port, &sw0_cb_data);
         if (ret < 0) 
             printk("Failed to register SW0 callback: %d\n", ret);
     }
 
-    if (lora) do {
-                if (!device_is_ready(lora)) 
+    if (role_devs->dev_lora) do {
+                if (!device_is_ready(role_devs->dev_lora)) 
                     printk("Lora device is not ready\n");
         
                 lora_cfg.tx = (role_get() == ROLE_FOB);
 
-                ret = lora_config(lora, &lora_cfg);
+                ret = lora_config(role_devs->dev_lora, &lora_cfg);
                 if (ret < 0) {
                     printk("Lora config failed: %d\n", ret);
                     break;
                 }
                 
-                if (lora && role_get() == ROLE_TRC) {
-                    ret = lora_recv_async(lora, lora_rx_cb, NULL);
+                if (role_devs->dev_lora && role_get() == ROLE_TRC) {
+                    ret = lora_recv_async(role_devs->dev_lora, lora_rx_cb, NULL);
                     if (ret < 0) {
                         printk("LoRa callback register failed: %d\n", ret);
                         break;
@@ -415,16 +465,16 @@ void run_bit() {
 
     
     // use graphics library to BIT screen
-    if (display) do {
-                if (!device_is_ready(display)) {
+    if (role_devs->dev_display) do {
+                if (!device_is_ready(role_devs->dev_display)) {
                     printk("Display device not ready\n");
                     break;
                 }
 
-                display_blanking_off(display);
+                display_blanking_off(role_devs->dev_display);
 
                 if (ROLE_IS_TRC) 
-                    gpio_pin_set_dt(&blight, true);
+                    gpio_pin_set_dt(role_devs->gpio_blight, true);
 
                 printk("Display OK\n");
 
@@ -440,21 +490,21 @@ void run_bit() {
     // static bool state = true;
 
     for (;;) {
-        /*int ret = */gpio_pin_toggle_dt(&led);
+        /*int ret = */gpio_pin_toggle_dt(role_devs->gpio_led0);
         // int read_state = gpio_pin_get_dt(&led);
         // printk("Hello World! %s\tState: %s\tRead State: %s\t", CONFIG_BOARD, state ? "ON " : "OFF", read_state == GPIO_OUTPUT_HIGH ? "HI" : "LO");
         // printk("%s%d\n\n", ret == 0 ? "    OK: " : "NOT OK: ", ret);
 
         // state = !state;
-        if (sw0_ok && sw0.port) {
+        if (sw0_ok && role_devs->gpio_sw0->port) {
             sw0_ok = false;
             // display sw0 pressed on display here eventually
 
-            if (lora && role_get() == ROLE_FOB) {
+            if (role_devs->dev_lora && role_get() == ROLE_FOB) {
                 // send ping
                 char data[] = "PING";
                 printk("Pinging TRC...\n");
-                ret = lora_send(lora, data, sizeof(data));
+                ret = lora_send(role_devs->dev_display, data, sizeof(data));
                 if (ret < 0) {
                     printk("Lora send failed: %d\n", ret);
                 }
@@ -462,7 +512,7 @@ void run_bit() {
                 // listen for pong
                 int16_t rssi;
                 uint8_t snr;
-                ret = lora_recv(lora, data, sizeof(data), K_MSEC(10000), &rssi, &snr);
+                ret = lora_recv(role_devs->dev_display, data, sizeof(data), K_MSEC(10000), &rssi, &snr);
                 if (ret < 0) {
                     printk("Lora recv failed: %d\n", ret);
                 } else {
@@ -472,21 +522,21 @@ void run_bit() {
             }
         }
 
-        if (lora && do_pong) do {
+        if (role_devs->dev_display && do_pong) do {
                 printk("Pinged, ponging...\n");
 
                 // stop rx
-                lora_recv_async(lora, NULL, NULL);
+                lora_recv_async(role_devs->dev_lora, NULL, NULL);
                 listening = false;
                 
                 lora_cfg.tx = true; 
-                int ret = lora_config(lora, &lora_cfg);
+                int ret = lora_config(role_devs->dev_lora, &lora_cfg);
                 if (ret < 0) {
                     printk("Lora rx cb: Set Lora cfg TX failed: %d\n", ret);
                     break;
                 }
 
-                ret = lora_send(lora, "PONG", 4);
+                ret = lora_send(role_devs->dev_lora, "PONG", 4);
                 if (ret < 0) {
                     printk("Lora send failed: %d\n", ret);
                     break;
@@ -495,7 +545,7 @@ void run_bit() {
 
                 k_msleep(100);
                 lora_cfg.tx = false; 
-                ret = lora_config(lora, &lora_cfg);
+                ret = lora_config(role_devs->dev_lora, &lora_cfg);
                 if (ret < 0) 
                     printk("Lora rx cb: Set Lora cfg RX failed: %d\n", ret);
                 
@@ -503,7 +553,7 @@ void run_bit() {
             } while (do_pong);
 
         if (!do_pong && !listening) {
-            lora_recv_async(lora, lora_rx_cb, NULL);
+            lora_recv_async(role_devs->dev_display, lora_rx_cb, NULL);
             listening = true;
         }
 
@@ -512,6 +562,6 @@ void run_bit() {
 }
 
 void stop_bit() {
-    gpio_remove_callback(sw0.port, &sw0_cb_data);
+    gpio_remove_callback(role_devs->gpio_sw0->port, &sw0_cb_data);
     k_sem_reset(&sw0_sem);
 }

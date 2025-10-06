@@ -24,13 +24,6 @@ extern const char* TRC_STR;
 #define ROLE_IS_FOB (role_get() == ROLE_FOB)
 #define ROLE_IS_TRC (role_get() == ROLE_TRC)
 
-extern const struct gpio_dt_spec led;
-extern const struct gpio_dt_spec sw0;
-
-extern const struct device * const lora;
-extern const struct device * const display;
-extern const struct gpio_dt_spec blight;
-
 typedef enum {
    DEVSTAT_NOTINSTALLED = 0,
    DEVSTAT_NOT_RDY,
