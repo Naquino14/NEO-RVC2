@@ -35,13 +35,10 @@
 
 	spim3_default: spim3_default {
 		group1 {
-			pinmux = <SPIM3_MISO_GPIO11>;
-			bias-pull-up;
+			pinmux = <SPIM3_MISO_GPIO11>,
+				 <SPIM3_SCLK_GPIO9>;
 		};
 		group2 {
-			pinmux = <SPIM3_SCLK_GPIO9>;
-		};
-		group3 {
 			pinmux = <SPIM3_MOSI_GPIO10>;
 			output-low;
 		};
