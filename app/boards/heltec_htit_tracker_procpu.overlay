@@ -40,7 +40,7 @@
 &spi3 {
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
             <&gpio1 13 GPIO_ACTIVE_LOW>,    // CAN module GPIO 45 == GPIO1 13
-            <&gpio0 4 GPIO_ACTIVE_LOW>;     // SD card
+            <&gpio1 14 GPIO_ACTIVE_LOW>;    // SD card GPIO 46 == GPIO1 14 
 
     can_over_spi: can@1 {
         compatible = "microchip,mcp2515";
