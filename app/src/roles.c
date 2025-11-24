@@ -152,15 +152,25 @@ static bool init_fob() {
 }
 
 static bool init_trc_sdhc() {
-    // const char* disk_pdrv = "SD";
+    const char* disk_pdrv = "SD";
 
-    // int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
-    // if (ret < 0) {
-    //     LOG_ERR("SD card init failed: storage init error %d", ret);
-    //     role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-    //     return false;
-    // }
-    role_devs->dev_sdcard_stat = DEVSTAT_RDY; // SDHC is buggy right now. Need scope to test. 
+    int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
+    if (ret < 0) {
+        LOG_ERR("SD card init failed: storage init error %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    k_msleep(200);
+
+    ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_DEINIT, NULL);
+    if (ret < 0) {
+        LOG_ERR("SD card init failed: storage deinit error %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_sdcard_stat = DEVSTAT_RDY;  
     LOG_INF("SDHC\t\tRDY");
 
     return true;

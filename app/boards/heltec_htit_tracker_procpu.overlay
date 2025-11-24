@@ -47,7 +47,7 @@
         reg = <1>;
         status = "okay";
         osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>; // GPIO 46 == GPIO1 14
+        int-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
     }; 
 
@@ -60,6 +60,6 @@
             disk-name = "SD";
             status = "okay";
         };
-        spi-max-frequency = <DT_FREQ_M(24)>;
+        spi-max-frequency = <DT_FREQ_M(16)>;
     };
 };

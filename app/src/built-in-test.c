@@ -216,12 +216,6 @@ static bool bit_sdhc() {
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
-    ret = fs_close(&tst_file);
-    if (ret < 0) {
-        LOG_ERR("SD close bit.txt file failed");
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-        return false;
-    }
     
     const char write_buf[11] = "SDHC\t\tOK?\n";
     ssize_t read_ret = fs_write(&tst_file, write_buf, sizeof(write_buf));
@@ -233,7 +227,7 @@ static bool bit_sdhc() {
 
     ret = fs_close(&tst_file);
     if (ret < 0) {
-        LOG_ERR("SD close written test file failed");
+        LOG_ERR("SD close written bit.txt file failed");
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
