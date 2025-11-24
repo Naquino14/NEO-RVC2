@@ -160,8 +160,8 @@ static bool init_trc_sdhc() {
     //     role_devs->dev_sdcard_stat = DEVSTAT_ERR;
     //     return false;
     // }
-    role_devs->dev_sdcard_stat = DEVSTAT_RDY;
-    LOG_INF("SDHC\t\tRDY");
+    role_devs->dev_sdcard_stat = DEVSTAT_NOTINSTALLED; // SDHC is buggy right now. Need scope to test. 
+    LOG_INF("SDHC\t\tNOT_INSTALLED");
 
     return true;
 }
