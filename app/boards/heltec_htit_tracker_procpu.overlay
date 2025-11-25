@@ -13,13 +13,9 @@
 &pinctrl {
     i2s_default: i2s_default {
         group1 {
-            pinmux = <I2S0_O_WS_GPIO6>, // set output WS pin
-                    <I2S0_O_BCK_GPIO5>, // set outpit BCK pin
-                    <I2S0_O_SD_GPIO4>; // serial data, not mode select
-        };
-
-        group2 {
-            pinmux = <I2S0_I_SD_GPIO7>;
+            pinmux = <I2S0_O_WS_GPIO6>, // set output WS pin (LRC)
+                    <I2S0_O_BCK_GPIO5>, // set outpit BCK pin (BCLK)
+                    <I2S0_O_SD_GPIO4>; // serial data, not mode select (DIN)
         };
     };
 };
