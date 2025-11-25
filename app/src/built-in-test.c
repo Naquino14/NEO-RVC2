@@ -14,6 +14,7 @@
 #include <ff.h>
 #include <lvgl.h>
 #include <lvgl_input_device.h>
+#include <math.h>
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -282,6 +283,60 @@ static bool bit_sdhc() {
     LOG_INF("SDHC\t\tOK");
     return true;
 }
+
+static bool bit_i2s() {
+    const int SAMPLE_RATE = 16000;
+    const int DURATION_MS = 500;
+    const int M_PI = 3.14159265358979323846;
+    const int TONE_FREQ = 1000; // 1kHz tone
+
+    struct i2s_config i2s_cfg = {
+        .word_size = 16,
+        .channels = 1,
+        .format = I2S_FMT_DATA_FORMAT_I2S,
+        .options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER,
+        .frame_clk_freq = SAMPLE_RATE,
+        .block_size = 256,
+        .timeout = 1000
+    };
+    int ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, &i2s_cfg);
+    if (ret < 0) {
+        LOG_ERR("I2S configure failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    // moveme ^ to role init
+    const int AMPLITUDE = 30000;
+    
+    /* Generate sine wave buffer */
+    int samples = (SAMPLE_RATE * DURATION_MS) / 1000;
+    int16_t buf[256]; // small buffer for streaming
+    int idx = 0;
+
+    for (int i = 0; i < samples; i += 256) {
+        for (int j = 0; j < 256; j++) {
+            buf[j] = (int16_t)(AMPLITUDE * sinf(2 * M_PI * TONE_FREQ * (idx++) / SAMPLE_RATE));
+        }
+        ret = i2s_write(role_devs->dev_i2s, buf, sizeof(buf));
+        if (ret < 0) {
+            LOG_ERR("I2S write error %d", ret);
+            return false;
+        }
+    }
+
+    /* Stop I2S */
+    ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_STOP);
+    if (ret < 0) {
+        LOG_ERR("I2S stop failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    LOG_INF("I2S\t\tOK");
+    return true;
+}
+
 #endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
@@ -357,6 +412,9 @@ bool bit_role_specific_basic() {
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
     if (!bit_sdhc())
+        ok = false;
+    
+    if (!bit_i2s())
         ok = false;
 
 #endif
