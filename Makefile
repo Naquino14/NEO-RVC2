@@ -21,7 +21,7 @@ auto:
 		$(MAKE) fob; \
 	else \
 		exit 1; \
-	endif
+	fi
 
 fob:
 	west build -b heltec_wifi_lora32_v3/esp32s3/procpu --sysbuild -s app -p auto -- \
