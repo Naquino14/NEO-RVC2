@@ -4,19 +4,24 @@ BAUDRATE := 115200
 
 # Note this is not for when multiple boards are connected
 ifneq ("$(wildcard /dev/ttyACM0)","")
-	BOARD_DEV := /dev/ttyACM0
+BOARD_DEV := /dev/ttyACM0
+
 else ifneq ("$(wildcard /dev/ttyUSB0)","")
-	BOARD_DEV := /dev/ttyUSB0
+BOARD_DEV := /dev/ttyUSB0
+
 else
-	$(error "No board found at /dev/ttyACM0 or /dev/ttyUSB0")
+$(error "No board found at /dev/ttyACM0 aka TRC, or /dev/ttyUSB0 aka FOB")
+BOARD_DEV := none
 endif
 
 auto:
 	@if [ "$(BOARD_DEV)" = "/dev/ttyACM0" ]; then \
 		$(MAKE) trc; \
-	else \
+	elif [ "$(BOARD_DEV)" = "/dev/ttyUSB0" ]; then \
 		$(MAKE) fob; \
-	fi
+	else \
+		exit 1; \
+	endif
 
 fob:
 	west build -b heltec_wifi_lora32_v3/esp32s3/procpu --sysbuild -s app -p auto -- \
