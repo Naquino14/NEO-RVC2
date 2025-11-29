@@ -20,6 +20,17 @@ LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
 K_SEM_DEFINE(sw0_sem, 0, 1);
 
+/* I2S BIT test parameters (TRC only) */
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+#define BIT_I2S_SAMPLE_NO 64
+#define BIT_I2S_CHANNELS 2
+#define BIT_I2S_WORD_SIZE 16
+#define BIT_I2S_SAMPLE_RATE 22050
+#define BIT_I2S_NUM_BLOCKS 8
+#define BIT_I2S_BLOCK_SIZE (BIT_I2S_CHANNELS * BIT_I2S_SAMPLE_NO * (BIT_I2S_WORD_SIZE/8))
+K_MEM_SLAB_DEFINE(bit_tx_slab, BIT_I2S_BLOCK_SIZE, BIT_I2S_NUM_BLOCKS, 4);
+#endif
+
 static bool sw0_ok = false;
 static struct gpio_callback sw0_cb_data;
 static void button_pressed(const struct device* dev, struct gpio_callback *cb, uint32_t pins) {
@@ -285,50 +296,91 @@ static bool bit_sdhc() {
 }
 
 static bool bit_i2s() {
-    const int SAMPLE_RATE = 16000;
-    const int DURATION_MS = 500;
-    const int M_PI = 3.14159265358979323846;
-    const int TONE_FREQ = 1000; // 1kHz tone
+    if (role_devs->dev_i2s_stat != DEVSTAT_RDY) {
+        LOG_WRN("I2S\t\tSKIP");
+        return true;
+    }
 
-    struct i2s_config i2s_cfg = {
-        .word_size = 16,
-        .channels = 1,
-        .format = I2S_FMT_DATA_FORMAT_I2S,
-        .options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER,
-        .frame_clk_freq = SAMPLE_RATE,
-        .block_size = 256,
-        .timeout = 1000
-    };
-    int ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, &i2s_cfg);
+    const struct device *dev_i2s = role_devs->dev_i2s;
+    if (!device_is_ready(dev_i2s)) {
+        LOG_ERR("I2S device not ready at playback");
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    /* simple sine wave generator parameters (from file-scope BIT_I2S_*) */
+    /* use compile-time macro for sample count */
+    const uint8_t channels = BIT_I2S_CHANNELS;
+    const uint8_t word_size = BIT_I2S_WORD_SIZE; /* bits */
+    const uint32_t sample_rate = BIT_I2S_SAMPLE_RATE;
+    const int NUM_BLOCKS = BIT_I2S_NUM_BLOCKS;
+    const size_t BLOCK_SIZE = BIT_I2S_BLOCK_SIZE;
+
+    /* Prepare i2s configuration */
+    struct i2s_config i2s_cfg = {0};
+    i2s_cfg.word_size = word_size;
+    i2s_cfg.channels = channels;
+    i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
+    i2s_cfg.options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
+    i2s_cfg.frame_clk_freq = sample_rate;
+    i2s_cfg.mem_slab = &bit_tx_slab;
+    i2s_cfg.block_size = BLOCK_SIZE;
+    i2s_cfg.timeout = 2000;
+
+    int ret = i2s_configure(dev_i2s, I2S_DIR_TX, &i2s_cfg);
     if (ret < 0) {
         LOG_ERR("I2S configure failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         return false;
     }
 
-    // moveme ^ to role init
-    const int AMPLITUDE = 30000;
-    
-    /* Generate sine wave buffer */
-    int samples = (SAMPLE_RATE * DURATION_MS) / 1000;
-    int16_t buf[256]; // small buffer for streaming
-    int idx = 0;
+    /* Generate a sine table for one period */
+    static int16_t sine[BIT_I2S_SAMPLE_NO];
+    const double PI = 3.14159265358979323846;
+    const double amplitude = 12000.0; /* safe amplitude for int16 */
+    for (int i = 0; i < BIT_I2S_SAMPLE_NO; i++) {
+        sine[i] = (int16_t)(amplitude * sin((2.0 * PI * i) / BIT_I2S_SAMPLE_NO));
+    }
 
-    for (int i = 0; i < samples; i += 256) {
-        for (int j = 0; j < 256; j++) {
-            buf[j] = (int16_t)(AMPLITUDE * sinf(2 * M_PI * TONE_FREQ * (idx++) / SAMPLE_RATE));
-        }
-        ret = i2s_write(role_devs->dev_i2s, buf, sizeof(buf));
+    /* Prepare one interleaved stereo block to reuse */
+    int16_t block_buf[BIT_I2S_SAMPLE_NO * BIT_I2S_CHANNELS];
+    for (int i = 0; i < BIT_I2S_SAMPLE_NO; i++) {
+        int16_t s = sine[i];
+        block_buf[2 * i] = s;       /* left */
+        block_buf[2 * i + 1] = s;   /* right */
+    }
+
+    /* Prime the queue with one block and start */
+    ret = i2s_buf_write(dev_i2s, block_buf, BLOCK_SIZE);
+    if (ret < 0) {
+        LOG_ERR("I2S write failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ret = i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
+    if (ret < 0) {
+        LOG_ERR("I2S trigger start failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    /* Write enough blocks to play for ~1 second */
+    const uint32_t blocks_for_one_sec = sample_rate / BIT_I2S_SAMPLE_NO;
+    for (uint32_t n = 1; n < blocks_for_one_sec; n++) {
+        ret = i2s_buf_write(dev_i2s, block_buf, BLOCK_SIZE);
         if (ret < 0) {
-            LOG_ERR("I2S write error %d", ret);
+            LOG_ERR("I2S write failed mid-playback: %d", ret);
+            i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
             return false;
         }
     }
 
-    /* Stop I2S */
-    ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_STOP);
+    /* Drain the TX queue and stop */
+    ret = i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
     if (ret < 0) {
-        LOG_ERR("I2S stop failed: %d", ret);
+        LOG_ERR("I2S trigger drain failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         return false;
     }
