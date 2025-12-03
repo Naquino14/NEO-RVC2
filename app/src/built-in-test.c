@@ -20,17 +20,6 @@ LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
 K_SEM_DEFINE(sw0_sem, 0, 1);
 
-/* I2S BIT test parameters (TRC only) */
-#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-#define BIT_I2S_SAMPLE_NO 64
-#define BIT_I2S_CHANNELS 2
-#define BIT_I2S_WORD_SIZE 16
-#define BIT_I2S_SAMPLE_RATE 22050
-#define BIT_I2S_NUM_BLOCKS 8
-#define BIT_I2S_BLOCK_SIZE (BIT_I2S_CHANNELS * BIT_I2S_SAMPLE_NO * (BIT_I2S_WORD_SIZE/8))
-K_MEM_SLAB_DEFINE(bit_tx_slab, BIT_I2S_BLOCK_SIZE, BIT_I2S_NUM_BLOCKS, 4);
-#endif
-
 static bool sw0_ok = false;
 static struct gpio_callback sw0_cb_data;
 static void button_pressed(const struct device* dev, struct gpio_callback *cb, uint32_t pins) {
@@ -295,93 +284,233 @@ static bool bit_sdhc() {
     return true;
 }
 
+typedef struct {
+    struct fs_file_t wav_file;
+    size_t filesize;
+    size_t chunk_size;
+    size_t subchunk1_size;
+    int16_t audio_format;
+    int16_t num_channels;
+    uint32_t sample_rate;
+    uint32_t byte_rate;
+    uint16_t block_align;
+    uint16_t bits_per_sample;
+    size_t subchunk2_size;
+} wav_file_t;
+
+static int open_parse_wav(const char* path, wav_file_t* out_wav) {
+    if (!out_wav)
+        return -EINVAL;
+    
+    struct fs_file_t wav_file;
+    fs_file_t_init(&out_wav->wav_file);
+
+    // open file
+    int ret = fs_open(&out_wav->wav_file, path, FS_O_READ);
+    if (ret < 0)
+        return ret;
+
+    // get total filesize
+    ret = fs_seek(&out_wav->wav_file, 0, FS_SEEK_END);
+    if (ret < 0)
+        return ret; 
+    out_wav->filesize = fs_tell(&out_wav->wav_file);
+    ret = fs_seek(&out_wav->wav_file, 0, FS_SEEK_SET);
+    if (ret < 0)
+        return ret;
+
+    // read all 44 header bytes at once
+    const size_t header_min_size = 44;
+    if (out_wav->filesize < header_min_size) {
+        fs_close(&out_wav->wav_file);
+        return -EINVAL;
+    }
+
+    uint8_t header_buf[header_min_size];
+    ssize_t read_ret = fs_read(&out_wav->wav_file, header_buf, sizeof(header_buf));
+    if (read_ret < 0 || fs_seek(&out_wav->wav_file, 0, FS_SEEK_SET) < 0) {
+        fs_close(&out_wav->wav_file);
+        return read_ret;
+    }
+    
+    const uint8_t* riff_off = header_buf,
+        chunk_size_off = header_buf + 0x04,
+        wave_off = header_buf + 0x08,
+        fmt_off = header_buf + 0x0C;
+    const int pcm_subchunk1_size = 16;
+    const size_t subchunk1size_idx = 0x10,
+                audio_format_idx = 0x14,
+                num_channels_idx = 0x16,
+                sample_rate_idx = 0x18,
+                byte_rate_idx = 0x1C,
+                block_align_idx = 0x20,
+                bits_per_sample_idx = 0x22;
+
+    if ((strncmp(riff_off, "RIFF", 4) != 0) 
+            || (strncmp(wave_off, "WAVE", 4) != 0)
+            || (strncmp(fmt_off, "fmt ", 4) != 0))
+        return -EFTYPE;
+    
+    out_wav->subchunk1_size = header_buf[subchunk1size_idx]
+                        | (header_buf[subchunk1size_idx + 1] << 8)
+                        | (header_buf[subchunk1size_idx + 2] << 16)
+                        | (header_buf[subchunk1size_idx + 3] << 24);
+    
+    if (out_wav->subchunk1_size != pcm_subchunk1_size)
+        return -ENOTSUP;    // compressed PCM support not planned atm
+
+    out_wav->audio_format = header_buf[audio_format_idx] | (header_buf[audio_format_idx] << 8);
+    if (out_wav->audio_format != 1)
+        return -ENOTSUP;    // other format support not planned atm
+    
+    out_wav->num_channels = header_buf[num_channels_idx] | (header_buf[num_channels_idx + 1] << 8);
+
+    out_wav->num_channels = header_buf[num_channels_idx] 
+                            | (header_buf[num_channels_idx + 1] << 8)
+                            | (header_buf[num_channels_idx + 2] << 16)
+                            | (header_buf[num_channels_idx + 3] << 24);
+    
+    out_wav->byte_rate = header_buf[byte_rate_idx]
+                        | (header_buf[byte_rate_idx + 1] << 8)
+                        | (header_buf[byte_rate_idx + 2] << 16)
+                        | (header_buf[byte_rate_idx + 3] << 24);
+    
+    out_wav->block_align = header_buf[block_align_idx] | (header_buf[block_align_idx + 1] << 8);
+
+    out_wav->bits_per_sample = header_buf[bits_per_sample_idx] | (header_buf[bits_per_sample_idx + 1] << 8);
+
+    uint32_t subchunk2_info[2];
+    ret = fs_read(&out_wav->wav_file, subchunk2_info, 2 * sizeof(uint32_t));
+    if (ret < 0 || ret != (2 * sizeof(int32_t))) 
+        return -EFTYPE; // data chunk not where we expect it
+
+    return 0;
+}
+
 static bool bit_i2s() {
     if (role_devs->dev_i2s_stat != DEVSTAT_RDY) {
         LOG_WRN("I2S\t\tSKIP");
         return true;
     }
 
-    const struct device *dev_i2s = role_devs->dev_i2s;
-    if (!device_is_ready(dev_i2s)) {
-        LOG_ERR("I2S device not ready at playback");
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        return false;
+    if (role_devs->dev_sdcard_stat != DEVSTAT_RDY) {
+        LOG_WRN("I2S\t\tSKIP");
+        return true;
     }
 
-    /* simple sine wave generator parameters (from file-scope BIT_I2S_*) */
-    /* use compile-time macro for sample count */
-    const uint8_t channels = BIT_I2S_CHANNELS;
-    const uint8_t word_size = BIT_I2S_WORD_SIZE; /* bits */
-    const uint32_t sample_rate = BIT_I2S_SAMPLE_RATE;
-    const int NUM_BLOCKS = BIT_I2S_NUM_BLOCKS;
-    const size_t BLOCK_SIZE = BIT_I2S_BLOCK_SIZE;
-
-    /* Prepare i2s configuration */
-    struct i2s_config i2s_cfg = {0};
-    i2s_cfg.word_size = word_size;
-    i2s_cfg.channels = channels;
-    i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
-    i2s_cfg.options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
-    i2s_cfg.frame_clk_freq = sample_rate;
-    i2s_cfg.mem_slab = &bit_tx_slab;
-    i2s_cfg.block_size = BLOCK_SIZE;
-    i2s_cfg.timeout = 2000;
-
-    int ret = i2s_configure(dev_i2s, I2S_DIR_TX, &i2s_cfg);
+    int ret = fs_mount(&sd_mnt_info);
     if (ret < 0) {
-        LOG_ERR("I2S configure failed: %d", ret);
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        LOG_ERR("I2S BIT SD fs failed to mount");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
-    /* Generate a sine table for one period */
-    static int16_t sine[BIT_I2S_SAMPLE_NO];
-    const double PI = 3.14159265358979323846;
-    const double amplitude = 12000.0; /* safe amplitude for int16 */
-    for (int i = 0; i < BIT_I2S_SAMPLE_NO; i++) {
-        sine[i] = (int16_t)(amplitude * sin((2.0 * PI * i) / BIT_I2S_SAMPLE_NO));
+    struct fs_file_t master_caution_file;
+    fs_file_t_init(&master_caution_file);
+    k_msleep(100);
+    const char* test_path = "/SD:/master-caution.wav";
+    ret = fs_open(&master_caution_file, test_path, FS_O_READ);
+    if (ret == -ENOENT) 
+        LOG_WRN("I2S BIT SD could not open mastercaution.wav for reading");
+    else if (ret < 0) {
+        LOG_ERR("I2S BIT SD open test failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        return false;
     }
+    k_msleep(100);
 
-    /* Prepare one interleaved stereo block to reuse */
-    int16_t block_buf[BIT_I2S_SAMPLE_NO * BIT_I2S_CHANNELS];
-    for (int i = 0; i < BIT_I2S_SAMPLE_NO; i++) {
-        int16_t s = sine[i];
-        block_buf[2 * i] = s;       /* left */
-        block_buf[2 * i + 1] = s;   /* right */
-    }
-
-    /* Prime the queue with one block and start */
-    ret = i2s_buf_write(dev_i2s, block_buf, BLOCK_SIZE);
+    // stream first n bytes (that fit in slab)
+    size_t audio_buf_size = role_devs->i2s_cfg->block_size;
+    int16_t *audio_buf = (int16_t*)k_malloc(audio_buf_size);
+    
+    // get total bytes in file
+    ret = fs_seek(&master_caution_file, 0, FS_SEEK_END);
     if (ret < 0) {
-        LOG_ERR("I2S write failed: %d", ret);
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        LOG_ERR("I2S BIT SD seek end failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
         return false;
     }
 
-    ret = i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
+    off_t master_caution_total_bytes = fs_tell(&master_caution_file);
+    if (master_caution_total_bytes < 0) {
+        LOG_ERR("I2S BIT SD tell failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
+        return false;
+    }
+
+    ret = fs_seek(&master_caution_file, 0, FS_SEEK_SET);
+    if (ret < 0) {
+        LOG_ERR("I2S BIT SD seek start failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
+        return false;
+    }
+
+    // prime i2s fifo with first block
+    ret = fs_read(&master_caution_file, audio_buf, audio_buf_size);
+    if (ret < 0) {
+        LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
+        return false;
+    }
+
+    ret = i2s_buf_write(role_devs->dev_i2s, (void*)audio_buf, role_devs->i2s_cfg->block_size);
+    if (ret < 0) {
+        LOG_ERR("Write 1 to dev failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
+        return false;
+    }
+
+    ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
     if (ret < 0) {
         LOG_ERR("I2S trigger start failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        k_free(audio_buf);
         return false;
     }
 
-    /* Write enough blocks to play for ~1 second */
-    const uint32_t blocks_for_one_sec = sample_rate / BIT_I2S_SAMPLE_NO;
-    for (uint32_t n = 1; n < blocks_for_one_sec; n++) {
-        ret = i2s_buf_write(dev_i2s, block_buf, BLOCK_SIZE);
+    // write rest of data
+    LOG_INF("Initial ftell: %ld, total bytes: %ld", fs_tell(&master_caution_file), master_caution_total_bytes);
+    while (fs_tell(&master_caution_file) < master_caution_total_bytes) {
+        off_t diff = master_caution_total_bytes - fs_tell(&master_caution_file);
+        size_t to_read = diff > audio_buf_size ? audio_buf_size : diff;
+        LOG_INF("I2S BIT SD reading %d bytes, %ld left", to_read, diff);
+
+        ret = fs_read(&master_caution_file, audio_buf, to_read);
         if (ret < 0) {
-            LOG_ERR("I2S write failed mid-playback: %d", ret);
-            i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
-            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
+            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+            k_free(audio_buf);
+            return false;
+        }
+
+        ret = i2s_buf_write(role_devs->dev_i2s, (void*)audio_buf, to_read);
+        if (ret < 0) {
+            LOG_ERR("I2S write to dev failed: %d", ret);
+            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+            i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+            k_free(audio_buf);
             return false;
         }
     }
+    k_free(audio_buf);
 
-    /* Drain the TX queue and stop */
-    ret = i2s_trigger(dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+    ret = fs_close(&master_caution_file);
     if (ret < 0) {
-        LOG_ERR("I2S trigger drain failed: %d", ret);
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        LOG_ERR("I2S BIT SD close read test file failed");
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    k_msleep(100);
+    ret = fs_unmount(&sd_mnt_info);
+    if (ret < 0) {
+        LOG_ERR("I2S BIT SD unmount failed %d", ret);
+        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 

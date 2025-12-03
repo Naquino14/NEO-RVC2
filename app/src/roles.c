@@ -42,6 +42,7 @@ static const role_devs_t m_role_devs = {
 
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
+    .i2s_cfg = NULL,
 
     .dev_sdcard_mnt_info = NULL,
     .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
@@ -66,6 +67,8 @@ static const struct fs_mount_t sdcard_mnt_info = {
     .mnt_point = "/SD:"
 };
 
+struct i2s_config i2s_cfg = {0};
+
 static role_devs_t m_role_devs = {
     .gpio_led0 = &led,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
@@ -86,6 +89,7 @@ static role_devs_t m_role_devs = {
 
     .dev_i2s = i2s,
     .dev_i2s_stat = DEVSTAT_NOT_RDY,
+    .i2s_cfg = &i2s_cfg,
 
     .dev_sdcard_mnt_info = &sdcard_mnt_info,
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
@@ -121,13 +125,16 @@ static bool init_common()
     role_devs->gpio_sw0_stat = DEVSTAT_RDY;
     LOG_INF("User switch\tRDY");
     
-    if (!device_is_ready(lora)) {
-        LOG_ERR("LoRa device is not ready");
-        role_devs->dev_lora_stat = DEVSTAT_ERR;
-        rdy = false;
-    }
-    role_devs->dev_lora_stat = DEVSTAT_RDY;
-    LOG_INF("LoRa\t\tRDY");
+    // if (!device_is_ready(lora)) {
+    //     LOG_ERR("LoRa device is not ready");
+    //     role_devs->dev_lora_stat = DEVSTAT_ERR;
+    //     rdy = false;
+    // }
+    // role_devs->dev_lora_stat = DEVSTAT_RDY;
+    // LOG_INF("LoRa\t\tRDY");
+
+    role_devs->dev_lora_stat = DEVSTAT_NOTINSTALLED; // DELETEME temporary lora disable
+    LOG_INF("LoRa\t\tNOT INSTALLED");
     
     if (!device_is_ready(role_devs->dev_lora)) {
         LOG_ERR("Display device is not ready");
@@ -136,13 +143,15 @@ static bool init_common()
     role_devs->dev_display_stat = DEVSTAT_RDY;
     LOG_INF("Display\t\tRDY");
 
-    if (!device_is_ready(role_devs->dev_can0)) {
-        LOG_ERR("CAN device is not ready");
-        role_devs->dev_can0_stat = DEVSTAT_ERR;
-        rdy = false;
-    }
-    role_devs->dev_can0_stat = DEVSTAT_RDY;
-    LOG_INF("CAN\t\tRDY");
+    // if (!device_is_ready(role_devs->dev_can0)) {
+    //     LOG_ERR("CAN device is not ready");
+    //     role_devs->dev_can0_stat = DEVSTAT_ERR;
+    //     rdy = false;
+    // }
+    // role_devs->dev_can0_stat = DEVSTAT_RDY;
+    // LOG_INF("CAN\t\tRDY");
+    role_devs->dev_can0_stat = DEVSTAT_NOTINSTALLED; // DELETEME temporary can disable
+    LOG_INF("CAN\t\tNOT INSTALLED");
 
     return rdy;
 }
@@ -176,19 +185,52 @@ static bool init_trc_sdhc() {
     return true;
 }
 
+K_MEM_SLAB_DEFINE(bit_tx_slab, I2S_BLOCK_SIZE, I2S_NUM_BLOCKS, 4);
+
+static bool init_trc_i2s() {
+    int ret = device_is_ready(role_devs->dev_i2s);
+    if (ret < 0) {
+        LOG_ERR("I2S device is not ready");
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    /* simple sine wave generator parameters (from file-scope BIT_I2S_*) */
+    /* use compile-time macro for sample count */
+    const uint8_t channels = I2S_CHANNELS;
+    const uint8_t word_size = I2S_WORD_SIZE_BYTES; /* bits */
+    const uint32_t sample_rate = I2S_SAMPLE_RATE_HZ;
+    const int NUM_BLOCKS = I2S_NUM_BLOCKS;
+    const size_t BLOCK_SIZE = I2S_BLOCK_SIZE;
+
+    /* Prepare i2s configuration */
+    role_devs->i2s_cfg->word_size = word_size;
+    role_devs->i2s_cfg->channels = channels;
+    role_devs->i2s_cfg->format = I2S_FMT_DATA_FORMAT_I2S;
+    role_devs->i2s_cfg->options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
+    role_devs->i2s_cfg->frame_clk_freq = sample_rate;
+    role_devs->i2s_cfg->mem_slab = &bit_tx_slab;
+    role_devs->i2s_cfg->block_size = BLOCK_SIZE;
+    role_devs->i2s_cfg->timeout = 250;
+
+    ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, role_devs->i2s_cfg);
+    if (ret < 0) {
+        LOG_ERR("I2S configure failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_i2s_stat = DEVSTAT_RDY;
+    LOG_INF("I2S\t\tRDY");
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
     rdy &= init_trc_sdhc();
 
-    int ret = device_is_ready(role_devs->dev_i2s);
-    if (ret < 0) {
-        LOG_ERR("I2S device is not ready");
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        rdy = false;
-    }
-    role_devs->dev_i2s_stat = DEVSTAT_RDY;
-    LOG_INF("I2S\t\tRDY");
+    rdy &= init_trc_i2s();
 
     return rdy;
 }
