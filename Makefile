@@ -10,7 +10,6 @@ else ifneq ("$(wildcard /dev/ttyUSB0)","")
 BOARD_DEV := /dev/ttyUSB0
 
 else
-$(error "No board found at /dev/ttyACM0 aka TRC, or /dev/ttyUSB0 aka FOB")
 BOARD_DEV := none
 endif
 
