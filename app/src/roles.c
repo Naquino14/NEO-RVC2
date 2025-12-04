@@ -42,7 +42,7 @@ static const role_devs_t m_role_devs = {
 
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
-    .i2s_cfg = NULL,
+    // .i2s_cfg = NULL,
 
     .dev_sdcard_mnt_info = NULL,
     .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
@@ -67,7 +67,7 @@ static const struct fs_mount_t sdcard_mnt_info = {
     .mnt_point = "/SD:"
 };
 
-struct i2s_config i2s_cfg = {0};
+// struct i2s_config i2s_cfg = {0};
 
 static role_devs_t m_role_devs = {
     .gpio_led0 = &led,
@@ -89,7 +89,7 @@ static role_devs_t m_role_devs = {
 
     .dev_i2s = i2s,
     .dev_i2s_stat = DEVSTAT_NOT_RDY,
-    .i2s_cfg = &i2s_cfg,
+    // .i2s_cfg = &i2s_cfg,
 
     .dev_sdcard_mnt_info = &sdcard_mnt_info,
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
@@ -195,30 +195,28 @@ static bool init_trc_i2s() {
         return false;
     }
 
-    /* simple sine wave generator parameters (from file-scope BIT_I2S_*) */
-    /* use compile-time macro for sample count */
-    const uint8_t channels = I2S_CHANNELS;
-    const uint8_t word_size = I2S_WORD_SIZE_BYTES; /* bits */
-    const uint32_t sample_rate = I2S_SAMPLE_RATE_HZ;
-    const int NUM_BLOCKS = I2S_NUM_BLOCKS;
-    const size_t BLOCK_SIZE = I2S_BLOCK_SIZE;
+    // const uint8_t channels = I2S_CHANNELS;
+    // const uint8_t word_size = I2S_WORD_SIZE_BYTES; /* bits */
+    // const uint32_t sample_rate = I2S_SAMPLE_RATE_HZ;
+    // const int NUM_BLOCKS = I2S_NUM_BLOCKS;
+    // const size_t BLOCK_SIZE = I2S_BLOCK_SIZE;
 
-    /* Prepare i2s configuration */
-    role_devs->i2s_cfg->word_size = word_size;
-    role_devs->i2s_cfg->channels = channels;
-    role_devs->i2s_cfg->format = I2S_FMT_DATA_FORMAT_I2S;
-    role_devs->i2s_cfg->options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
-    role_devs->i2s_cfg->frame_clk_freq = sample_rate;
-    role_devs->i2s_cfg->mem_slab = &bit_tx_slab;
-    role_devs->i2s_cfg->block_size = BLOCK_SIZE;
-    role_devs->i2s_cfg->timeout = 250;
+    // /* Prepare i2s configuration */
+    // role_devs->i2s_cfg->word_size = word_size;
+    // role_devs->i2s_cfg->channels = channels;
+    // role_devs->i2s_cfg->format = I2S_FMT_DATA_FORMAT_I2S;
+    // role_devs->i2s_cfg->options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
+    // role_devs->i2s_cfg->frame_clk_freq = sample_rate;
+    // role_devs->i2s_cfg->mem_slab = &bit_tx_slab;
+    // role_devs->i2s_cfg->block_size = BLOCK_SIZE;
+    // role_devs->i2s_cfg->timeout = 250;
 
-    ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, role_devs->i2s_cfg);
-    if (ret < 0) {
-        LOG_ERR("I2S configure failed: %d", ret);
-        role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        return false;
-    }
+    // ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, role_devs->i2s_cfg);
+    // if (ret < 0) {
+    //     LOG_ERR("I2S configure failed: %d", ret);
+    //     role_devs->dev_i2s_stat = DEVSTAT_ERR;
+    //     return false;
+    // }
 
     role_devs->dev_i2s_stat = DEVSTAT_RDY;
     LOG_INF("I2S\t\tRDY");
