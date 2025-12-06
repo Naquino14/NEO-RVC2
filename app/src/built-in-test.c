@@ -336,6 +336,7 @@ static int open_parse_wav(const char* path, wav_file_t* out_wav) {
     const uint8_t* chunk_size_off = header_buf + 0x04;
     const uint8_t* wave_off = header_buf + 0x08;
     const uint8_t* fmt_off = header_buf + 0x0C;
+    const uint8_t* data_off = header_buf + 0x24;
     const int pcm_subchunk1_size = 16;
     const size_t subchunk1size_idx = 0x10,
                 audio_format_idx = 0x14,
@@ -343,7 +344,8 @@ static int open_parse_wav(const char* path, wav_file_t* out_wav) {
                 sample_rate_idx = 0x18,
                 byte_rate_idx = 0x1C,
                 block_align_idx = 0x20,
-                bits_per_sample_idx = 0x22;
+                bits_per_sample_idx = 0x22,
+                subchunk2_size_idx = 0x28;
 
     if ((strncmp(riff_off, "RIFF", 4) != 0) 
             || (strncmp(wave_off, "WAVE", 4) != 0)
@@ -387,22 +389,14 @@ static int open_parse_wav(const char* path, wav_file_t* out_wav) {
 
     out_wav->bits_per_sample = header_buf[bits_per_sample_idx] | (header_buf[bits_per_sample_idx + 1] << 8);
 
-    uint32_t subchunk2_info[2];
-    ret = fs_read(&out_wav->wav_file, subchunk2_info, 2 * sizeof(uint32_t));
-    if (ret < 0 || ret != (2 * sizeof(int32_t))) 
-        return -EFTYPE; // data chunk not where we expect it
-
-    // BEGIN WIP
-    const char* subchunk2_id = (char*)&subchunk2_info[0];
-    printk("Subchunk2 ID: %.4s\n", (char*)subchunk2_id);
-
-    if (strncmp((const char*)subchunk2_info, "data", 4) != 0) {
+    if (strncmp(data_off, "data", 4) != 0) {
         LOG_ERR("WAV data subchunk not found in file %s", path);
         return -EFTYPE;
     }
 
-    out_wav->subchunk2_size = subchunk2_info[1];
-    // END WIP
+    out_wav->subchunk2_size = header_buf[subchunk2_size_idx] | (header_buf[subchunk2_size_idx + 1] << 8) 
+                            | (header_buf[subchunk2_size_idx + 2] << 16) | (header_buf[subchunk2_size_idx + 3] << 24);
+                            
     return 0;
 }
 
