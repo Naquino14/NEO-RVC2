@@ -424,7 +424,7 @@ static bool bit_i2s() {
     }
 
     wav_file_t master_caution_wav;
-    ret = open_parse_wav("/SD:/spike.wav", &master_caution_wav);
+    ret = open_parse_wav("/SD:/master-caution.wav", &master_caution_wav);
     if (ret < 0) {
         LOG_ERR("I2S BIT SD open/parse master-caution.wav failed: %d", ret);
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
@@ -470,8 +470,10 @@ static bool bit_i2s() {
         return false;
     }
 
-    // prime i2s fifo with first block
     uint16_t audio_buf[I2S_TX_BLOCKSIZE / sizeof(uint16_t)];
+    void* tx_block[I2S_NUM_BLOCKS];
+    int blockno = 0;
+    // prime i2s fifo with first block
     ret = fs_read(&master_caution_wav.wav_file, audio_buf, sizeof(audio_buf));
     if (ret < 0) {
         LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
@@ -481,15 +483,93 @@ static bool bit_i2s() {
         return false;
     }
 
-    ret = i2s_write(role_devs->dev_i2s, audio_buf, i2s_cfg.block_size);
+    // check if ret is less than buffer size, zero out rest, play, and exit
+    if (ret < sizeof(audio_buf)) {
+        LOG_WRN("I2S BIT abnormally SD small wav detected");
+        size_t to_zero = sizeof(audio_buf) - ret;
+        memset(((uint8_t*)audio_buf) + ret, 0, to_zero);
+        
+        ret = k_mem_slab_alloc(&i2s_tx_slab, (void**)&tx_block[blockno], K_MSEC(1000));
+        if (ret < 0) {
+            LOG_ERR("I2S BIT SD mem slab alloc for small buf failed: %d", ret);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            fs_close(&master_caution_wav.wav_file);
+            fs_unmount(&sd_mnt_info);
+            return false;
+        }
+        memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
+        ret = i2s_write(role_devs->dev_i2s, tx_block[blockno], i2s_cfg.block_size);
+        if (ret < 0) {
+            LOG_ERR("I2S write small buf to dev failed: %d", ret);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
+            fs_close(&master_caution_wav.wav_file);
+            fs_unmount(&sd_mnt_info);
+            return false;
+        }
+        ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
+        if (ret < 0) {
+            LOG_ERR("I2S trigger start for small buf failed: %d", ret);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
+            fs_close(&master_caution_wav.wav_file);
+            fs_unmount(&sd_mnt_info);
+            return false;
+        }
+
+        k_msleep(10);
+
+        ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+        if (ret < 0) {
+            LOG_ERR("I2S trigger drain for small buf failed: %d", ret);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
+            fs_close(&master_caution_wav.wav_file);
+            fs_unmount(&sd_mnt_info);
+            return false;
+        }
+
+        k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
+        ret = fs_close(&master_caution_wav.wav_file);
+        if (ret < 0) {
+            LOG_ERR("I2S BIT SD close read test file failed");
+            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+            return false;
+        }
+
+        ret = fs_unmount(&sd_mnt_info);
+        if (ret < 0) {
+            LOG_ERR("I2S BIT SD unmount failed %d", ret);
+            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+            return false;
+        }
+
+        LOG_INF("I2S\t\tOK");
+        return true;
+    }
+
+    // block is full, copy to slab and write, then increment blockno
+    ret = k_mem_slab_alloc(&i2s_tx_slab, (void**)&tx_block[blockno], K_MSEC(1000));
     if (ret < 0) {
-        LOG_ERR("Write to dev failed");
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+        LOG_ERR("I2S BIT SD mem slab alloc failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
         fs_unmount(&sd_mnt_info);
         return false;
     }
+    memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
+    ret = i2s_write(role_devs->dev_i2s, tx_block[blockno], i2s_cfg.block_size);
+    if (ret < 0) {
+        LOG_ERR("I2S write to dev failed: %d", ret);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
+        fs_close(&master_caution_wav.wav_file);
+        fs_unmount(&sd_mnt_info);
+        return false;
+    }
+    blockno = (blockno + 1) % I2S_NUM_BLOCKS;
 
+    // first block is primed, trigger i2s and start reading/writing rest of data;
     ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
     if (ret < 0) {
         LOG_ERR("I2S trigger start failed: %d", ret);
@@ -499,12 +579,21 @@ static bool bit_i2s() {
         return false;
     }
 
-    // write rest of data
-    off_t file_pos = fs_tell(&master_caution_wav.wav_file);
-    while (file_pos < master_caution_wav.filesize) {
+    // idea: loop until we reach the end of file
+    // read block, write block, increment blockno
+    // if block at blockno is in use by i2s, read data and wait for it to be free
+    for (;;) {
+        // check if end of file reached
+        off_t file_pos = fs_tell(&master_caution_wav.wav_file);
+        if (file_pos >= master_caution_wav.filesize)
+            break;
+        
+        // check difference betweeen file pos and filesize
         off_t diff = master_caution_wav.filesize - file_pos;
-        size_t to_read = diff > sizeof(audio_buf) ? sizeof(audio_buf) : diff;
 
+        // if difference is less than buffer size, read only remaining data
+        size_t to_read = diff > sizeof(audio_buf) ? sizeof(audio_buf) : diff;
+        
         ret = fs_read(&master_caution_wav.wav_file, audio_buf, to_read);
         if (ret < 0) {
             LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
@@ -514,19 +603,37 @@ static bool bit_i2s() {
             return false;
         }
 
-        ret = i2s_write(role_devs->dev_i2s, audio_buf, to_read);
+        // if block is not full, zero out the rest
+        if (to_read < sizeof(audio_buf)) {
+            size_t to_zero = sizeof(audio_buf) - to_read;
+            memset(((uint8_t*)audio_buf) + to_read, 0, to_zero);
+        }
+
+        // try to alloc block at blockno
+        ret = k_mem_slab_alloc(&i2s_tx_slab, (void**)&tx_block[blockno], K_MSEC(1000));
+        if (ret < 0) {
+            LOG_ERR("I2S BIT SD mem slab alloc failed (may have timed out): %d", ret);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            fs_close(&master_caution_wav.wav_file);
+            fs_unmount(&sd_mnt_info);
+            return false;
+        }
+        memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
+        ret = i2s_write(role_devs->dev_i2s, tx_block[blockno], i2s_cfg.block_size);
         if (ret < 0) {
             LOG_ERR("I2S write to dev failed: %d", ret);
-            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-            i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+            role_devs->dev_i2s_stat = DEVSTAT_ERR;
+            k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
             fs_close(&master_caution_wav.wav_file);
             fs_unmount(&sd_mnt_info);
             return false;
         }
 
-        file_pos = fs_tell(&master_caution_wav.wav_file);
+        // increment write blockno
+        blockno = (blockno + 1) % I2S_NUM_BLOCKS;
     }
 
+    // all data is read, trigger i2s fifo drain
     ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
     if (ret < 0) {
         LOG_ERR("I2S trigger drain failed: %d", ret);
