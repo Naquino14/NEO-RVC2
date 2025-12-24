@@ -11,10 +11,11 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
 
-#include <ff.h>
 #include <lvgl.h>
 #include <lvgl_input_device.h>
 #include <math.h>
+
+#include "sys/storage.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -184,13 +185,6 @@ static bool bit_display_st7735(bool wait_sw0)
     return true;
 }
 
-static FATFS sd_fs_fat_info;
-static struct fs_mount_t sd_mnt_info = {
-    .type = FS_FATFS,
-    .fs_data = &sd_fs_fat_info,
-    .mnt_point = "/SD:"
-};
-
 static bool bit_sdhc() {
     if (role_devs->dev_sdcard_stat != DEVSTAT_RDY) {
         LOG_WRN("SDHC\t\tSKIP");
@@ -198,12 +192,9 @@ static bool bit_sdhc() {
     }
 
     // mount, read, write, check write, unmount
-    int ret = fs_mount(&sd_mnt_info);
-    if (ret < 0) {
-        LOG_ERR("SD fs failed to mount");
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+    int ret = nrvc2_fs_mount();
+    if (ret < 0)
         return false;
-    }
 
     struct fs_file_t tst_file;
     fs_file_t_init(&tst_file);
@@ -214,6 +205,7 @@ static bool bit_sdhc() {
         LOG_WRN("SD could not open bit.txt for writing");
     else if (ret < 0) {
         LOG_ERR("SD open test failed %d", ret);
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -222,6 +214,7 @@ static bool bit_sdhc() {
     ssize_t read_ret = fs_write(&tst_file, write_buf, sizeof(write_buf));
     if (read_ret < 0) {
         LOG_ERR("SD write test file failed");
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -229,6 +222,7 @@ static bool bit_sdhc() {
     ret = fs_close(&tst_file);
     if (ret < 0) {
         LOG_ERR("SD close written bit.txt file failed");
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -238,6 +232,7 @@ static bool bit_sdhc() {
     ret = fs_open(&tst_file, test_path, FS_O_READ);
     if (ret < 0) {
         LOG_ERR("SD open test file for read failed %d", ret);
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -246,6 +241,7 @@ static bool bit_sdhc() {
     read_ret = fs_read(&tst_file, read_buf, sizeof(read_buf));
     if (read_ret < 0) {
         LOG_ERR("SD read test file failed %d", read_ret);
+        nrvc2_fs_unmount(); 
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -253,6 +249,7 @@ static bool bit_sdhc() {
     ret = fs_close(&tst_file);
     if (ret < 0) {
         LOG_ERR("SD close read test file failed");
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -260,6 +257,7 @@ static bool bit_sdhc() {
     ret = strncmp(read_buf, write_buf, sizeof(read_buf));
     if (ret != 0) {
         LOG_ERR("SD read/write data mismatch");
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
@@ -268,17 +266,15 @@ static bool bit_sdhc() {
     ret = fs_unlink(test_path);
     if (ret < 0) { 
         LOG_ERR("SD delete test file failed %d", ret);
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
     k_msleep(100);
-    ret = fs_unmount(&sd_mnt_info);
-    if (ret < 0) {
-        LOG_ERR("SD unmount failed %d", ret);
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+    ret = nrvc2_fs_unmount();
+    if (ret < 0) 
         return false;
-    }
 
     LOG_INF("SDHC\t\tOK");
     return true;
@@ -416,10 +412,8 @@ static bool bit_i2s() {
         return true;
     }
 
-    int ret = fs_mount(&sd_mnt_info);
+    int ret = nrvc2_fs_mount();
     if (ret < 0) {
-        LOG_ERR("I2S BIT SD fs failed to mount");
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         return false;
     }
 
@@ -427,8 +421,8 @@ static bool bit_i2s() {
     ret = open_parse_wav("/SD:/master-caution.wav", &master_caution_wav);
     if (ret < 0) {
         LOG_ERR("I2S BIT SD open/parse master-caution.wav failed: %d", ret);
+        nrvc2_fs_unmount();
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-        fs_unmount(&sd_mnt_info);
         return false;
     }
     
@@ -466,7 +460,7 @@ static bool bit_i2s() {
         LOG_ERR("I2S BIT SD i2s configure failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
 
@@ -479,7 +473,7 @@ static bool bit_i2s() {
         LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
         role_devs->dev_sdcard_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
 
@@ -494,7 +488,7 @@ static bool bit_i2s() {
             LOG_ERR("I2S BIT SD mem slab alloc for small buf failed: %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
         memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
@@ -504,7 +498,7 @@ static bool bit_i2s() {
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
         ret = i2s_trigger(role_devs->dev_i2s, I2S_DIR_TX, I2S_TRIGGER_START);
@@ -513,7 +507,7 @@ static bool bit_i2s() {
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
 
@@ -525,7 +519,7 @@ static bool bit_i2s() {
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
 
@@ -537,12 +531,7 @@ static bool bit_i2s() {
             return false;
         }
 
-        ret = fs_unmount(&sd_mnt_info);
-        if (ret < 0) {
-            LOG_ERR("I2S BIT SD unmount failed %d", ret);
-            role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-            return false;
-        }
+        nrvc2_fs_unmount();
 
         LOG_INF("I2S\t\tOK");
         return true;
@@ -554,7 +543,7 @@ static bool bit_i2s() {
         LOG_ERR("I2S BIT SD mem slab alloc failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
     memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
@@ -564,7 +553,7 @@ static bool bit_i2s() {
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
     blockno = (blockno + 1) % I2S_NUM_BLOCKS;
@@ -575,7 +564,7 @@ static bool bit_i2s() {
         LOG_ERR("I2S trigger start failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
 
@@ -599,7 +588,7 @@ static bool bit_i2s() {
             LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
             role_devs->dev_sdcard_stat = DEVSTAT_ERR;
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
 
@@ -615,7 +604,7 @@ static bool bit_i2s() {
             LOG_ERR("I2S BIT SD mem slab alloc failed (may have timed out): %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
         memcpy(tx_block[blockno], audio_buf, sizeof(audio_buf));
@@ -625,7 +614,7 @@ static bool bit_i2s() {
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
             fs_close(&master_caution_wav.wav_file);
-            fs_unmount(&sd_mnt_info);
+            nrvc2_fs_unmount();
             return false;
         }
 
@@ -639,7 +628,7 @@ static bool bit_i2s() {
         LOG_ERR("I2S trigger drain failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         fs_close(&master_caution_wav.wav_file);
-        fs_unmount(&sd_mnt_info);
+        nrvc2_fs_unmount();
         return false;
     }
 
@@ -652,12 +641,7 @@ static bool bit_i2s() {
         return false;
     }
 
-    ret = fs_unmount(&sd_mnt_info);
-    if (ret < 0) {
-        LOG_ERR("I2S BIT SD unmount failed %d", ret);
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-        return false;
-    }
+    nrvc2_fs_unmount();
 
     LOG_INF("I2S\t\tOK");
     return true;
