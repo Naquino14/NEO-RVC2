@@ -172,10 +172,21 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
         return ret;
     }
 
-    #warning FIXME This may fall apart when WAV is not signed 16 bit PCM
+    // #warning FIXME This may fall apart when WAV is not signed 16 bit PCM
+    // solution: I want to move on from this, so dont support anything thats not 2 bytes
     uint16_t audio_buf[I2S_TX_BLOCKSIZE / sizeof(uint16_t)]; 
     void* tx_block[I2S_NUM_BLOCKS];
     int blockno = 0;
+
+    // check if data is 16 bit unsigned PCM
+    if (master_caution_wav.bits_per_sample != 16) {
+        LOG_ERR("I2S BIT SD unsupported bits per sample %d", master_caution_wav.bits_per_sample);
+        role_devs->dev_i2s_stat = DEVSTAT_ERR;
+        fs_close(&master_caution_wav.wav_file);
+        k_sem_give(&i2s_dev_sem); 
+        return -ENOTSUP;
+    } 
+
     // prime i2s fifo with first block
     ret = fs_read(&master_caution_wav.wav_file, audio_buf, sizeof(audio_buf));
     if (ret < 0) {
