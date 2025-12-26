@@ -11,6 +11,7 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/disk_access.h>
 #include <ff.h>
+#include <zephyr/drivers/i2s.h>
 
 extern const char* FOB_STR;
 extern const char* TRC_STR;
@@ -23,12 +24,47 @@ extern const char* TRC_STR;
 #define ROLE_IS_FOB (role_get() == ROLE_FOB)
 #define ROLE_IS_TRC (role_get() == ROLE_TRC)
 
-extern const struct gpio_dt_spec led;
-extern const struct gpio_dt_spec sw0;
+#define I2S_SAMPLES_PER_BLOCK 64
+#define I2S_CHANNELS 2
+#define I2S_WORD_SIZE_BYTES sizeof(int16_t)
+#define I2S_SAMPLE_RATE_HZ 44100
+#define I2S_NUM_BLOCKS 8
+#define I2S_BLOCK_SIZE (I2S_CHANNELS * I2S_SAMPLES_PER_BLOCK * I2S_WORD_SIZE_BYTES)
 
-extern const struct device *lora;
-extern const struct device *display;
-extern const struct gpio_dt_spec blight;
+typedef enum {
+   DEVSTAT_NOTINSTALLED = 0,
+   DEVSTAT_NOT_RDY,
+   DEVSTAT_RDY,
+   DEVSTAT_ERR
+} devstat_t;
+
+typedef struct  {
+   const struct gpio_dt_spec *gpio_led0;
+   devstat_t gpio_led0_stat;
+
+   const struct gpio_dt_spec *gpio_sw0;
+   devstat_t gpio_sw0_stat;
+
+   const struct device *dev_lora;
+   devstat_t dev_lora_stat;
+
+   const struct device *dev_display;
+   const struct gpio_dt_spec *gpio_blight;
+   devstat_t dev_display_stat;
+   devstat_t gpio_blight_stat;
+
+   const struct device *dev_can0;
+   devstat_t dev_can0_stat;
+
+   const struct device *dev_i2s;
+   devstat_t dev_i2s_stat;
+   // struct i2s_config *i2s_cfg;
+
+   const struct fs_mount_t *dev_sdcard_mnt_info;
+   devstat_t dev_sdcard_stat;
+} role_devs_t;
+
+extern role_devs_t* role_devs;
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 #define LORA_MAX_POW_DBM 14

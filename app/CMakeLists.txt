@@ -9,4 +9,6 @@ target_sources(app PRIVATE
     src/main.c
     src/built-in-test.c
     src/roles.c
+    src/sys/storage.c
+    src/sys/audio.c
 )
