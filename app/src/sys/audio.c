@@ -137,7 +137,7 @@ static struct i2s_config i2s_cfg = {
 };
 
 /// Semaphore to limit how many audio files that can wait at once.
-K_SEM_DEFINE(i2s_dev_sem, 0, 1);
+K_SEM_DEFINE(i2s_dev_sem, 1, 1);
 
 int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     // Playing audio requires ready SD card and I2S amp
@@ -155,7 +155,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     
     // begin I2S PCM stream critical zone
     ret = k_sem_take(&i2s_dev_sem, busy_timeout);
-    if (ret <= 0) // I2S is busy and may have timed out
+    if (ret < 0) // I2S is busy and may have timed out
         return ret;
 
     // set params
