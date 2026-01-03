@@ -58,9 +58,7 @@ typedef struct  {
 
    const struct device *dev_i2s;
    devstat_t dev_i2s_stat;
-   // struct i2s_config *i2s_cfg;
 
-   const struct fs_mount_t *dev_sdcard_mnt_info;
    devstat_t dev_sdcard_stat;
 } role_devs_t;
 

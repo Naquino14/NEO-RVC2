@@ -41,10 +41,16 @@ menu "Installed Devices"
     
     if DEVICE_ROLE = 2 
         config EN_DEV_I2S
-        bool "I2S Amp Installed"
-        default y
-        help
-            Enable if I2S Amplifier is installed.
+            bool "I2S Amp Installed"
+            default y
+            help
+                Enable if I2S Amplifier is installed.
+        
+        config EN_DEV_SDHC
+            bool "SD Card Installed"
+            default y
+            help
+                Enable if SD Card/Reader is installed.
     endif
 endmenu 
 

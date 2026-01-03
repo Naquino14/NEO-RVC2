@@ -71,13 +71,6 @@ const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
 #endif
 
-static FATFS sd_fs_fat_info;
-static const struct fs_mount_t sdcard_mnt_info = {
-    .type = FS_FATFS,
-    .fs_data = &sd_fs_fat_info,
-    .mnt_point = "/SD:"
-};
-
 static role_devs_t m_role_devs_trc = {
 #if CONFIG_EN_GPIO_LED0
     .gpio_led0 = &led0,
@@ -131,8 +124,11 @@ static role_devs_t m_role_devs_trc = {
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
-    .dev_sdcard_mnt_info = &sdcard_mnt_info,
+#if CONFIG_EN_DEV_SDHC
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
+#else
+    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+#endif
 };
 role_devs_t* role_devs = &m_role_devs_trc;
 
@@ -213,6 +209,11 @@ static bool init_fob() {
 }
 
 static bool init_trc_sdhc() {
+    if (role_devs->dev_sdcard_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("SDHC\t\tNOT INSTALLED");
+        return true;
+    }
+
     const char* disk_pdrv = "SD";
 
     int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
@@ -222,7 +223,7 @@ static bool init_trc_sdhc() {
         return false;
     }
 
-    k_msleep(200);
+    k_msleep(10);
 
     ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_DEINIT, NULL);
     if (ret < 0) {

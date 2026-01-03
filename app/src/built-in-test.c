@@ -287,6 +287,7 @@ static bool bit_i2s() {
     }
 
     if (role_devs->dev_sdcard_stat != DEVSTAT_RDY) {
+        LOG_INF("I2S BIT SDHC NOT INSTALLED");
         LOG_WRN("I2S\t\tSKIP");
         return true;
     }
