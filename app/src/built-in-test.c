@@ -26,7 +26,7 @@ static bool sw0_ok = false;
 static struct gpio_callback sw0_cb_data;
 static void button_pressed(const struct device* dev, struct gpio_callback *cb, uint32_t pins) {
     if (!sw0_ok)
-        LOG_INF("User switch\t\tOK");
+        LOG_INF("SW0\t\tOK");
     k_sem_give(&sw0_sem);
     sw0_ok = true;
 }
@@ -49,12 +49,7 @@ static void lora_rx_cb(const struct device *dev, uint8_t* data, uint16_t len, in
 }
 
 bool bit_led() {
-    printk("hit1\n");
-    k_msleep(250);
     if (role_devs->gpio_led0_stat != DEVSTAT_RDY) {
-        printk("hit2\n");
-        k_msleep(250);
-
         LOG_WRN("LED0\t\tSKIP");
         return true;
     }

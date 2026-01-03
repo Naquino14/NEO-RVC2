@@ -88,8 +88,13 @@ static role_devs_t m_role_devs = {
     .gpio_sw0_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
+#if CONFIG_EN_DEV_LORA
     .dev_lora = lora,
     .dev_lora_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_lora = NULL,
+    .dev_lora_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
     .dev_display = display,
     .gpio_blight = &blight,
@@ -101,7 +106,6 @@ static role_devs_t m_role_devs = {
 
     .dev_i2s = i2s,
     .dev_i2s_stat = DEVSTAT_NOT_RDY,
-    // .i2s_cfg = &i2s_cfg,
 
     .dev_sdcard_mnt_info = &sdcard_mnt_info,
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
@@ -141,26 +145,26 @@ static bool init_common()
         rdy = false;
     } else {
         role_devs->gpio_sw0_stat = DEVSTAT_RDY;
-        LOG_INF("User switch\tRDY");
+        LOG_INF("SW0\t\tRDY");
     }
     
-    // if (!device_is_ready(lora)) {
-    //     LOG_ERR("LoRa device is not ready");
-    //     role_devs->dev_lora_stat = DEVSTAT_ERR;
-    //     rdy = false;
-    // }
-    // role_devs->dev_lora_stat = DEVSTAT_RDY;
-    // LOG_INF("LoRa\t\tRDY");
+    if (role_devs->dev_lora_stat == DEVSTAT_NOTINSTALLED)
+        LOG_INF("LORA\t\tNOT INSTALLED");
+    else if (!device_is_ready(lora)) {
+        LOG_ERR("LoRa device is not ready");
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
+        rdy = false;
+    } else {
+        role_devs->dev_lora_stat = DEVSTAT_RDY;
+        LOG_INF("LORA\t\tRDY");
+    }
 
-    role_devs->dev_lora_stat = DEVSTAT_NOTINSTALLED; // DELETEME temporary lora disable
-    LOG_INF("LoRa\t\tNOT INSTALLED");
-    
-    if (!device_is_ready(role_devs->dev_lora)) {
+    if (!device_is_ready(role_devs->dev_display)) {
         LOG_ERR("Display device is not ready");
         rdy = false;
     }
     role_devs->dev_display_stat = DEVSTAT_RDY;
-    LOG_INF("Display\t\tRDY");
+    LOG_INF("DISPLAY\t\tRDY");
 
     // if (!device_is_ready(role_devs->dev_can0)) {
     //     LOG_ERR("CAN device is not ready");

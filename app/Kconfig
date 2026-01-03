@@ -10,13 +10,19 @@ config EN_GPIO_LED0
     bool "LED0 Installed"
     default y
     help
-        Enable if LED0 is installed.
+        Enable if LED 0 is installed.
 
 config EN_GPIO_SW0
     bool "SW0 Installed"
     default y
     help
-        Enable if SW0 is installed.
+        Enable if Switch 0 is installed.
+
+config EN_DEV_LORA
+    bool "LORA Installed"
+    default y
+    help
+        Enable if LoRa transmitter is installed. 
 
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"
