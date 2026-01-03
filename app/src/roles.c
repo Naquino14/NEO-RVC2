@@ -59,11 +59,12 @@ const role_devs_t* role_devs = &m_role_devs;
 
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 
+#if CONFIG_EN_DEV_DISPLAY
 #define DISPLAY_NODE DT_NODELABEL(st7735)
 const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
-
 #define BLIGHT_NODE DT_ALIAS(blight)
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
+#endif
 
 #define I2S_NODE DT_ALIAS(i2s_tx)
 const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
@@ -100,10 +101,17 @@ static role_devs_t m_role_devs_trc = {
     .dev_lora_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
+#if CONFIG_EN_DEV_DISPLAY
     .dev_display = display,
     .gpio_blight = &blight,
     .dev_display_stat = DEVSTAT_NOT_RDY,
     .gpio_blight_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_display = NULL,
+    .gpio_blight = NULL,
+    .dev_display_stat = DEVSTAT_NOTINSTALLED,
+    .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
 #if CONFIG_EN_DEV_CAN0
     .dev_can0 = can0,
@@ -168,12 +176,16 @@ static bool init_common()
         LOG_INF("LORA\t\tRDY");
     }
 
-    if (!device_is_ready(role_devs->dev_display)) {
+    if (role_devs->dev_display_stat == DEVSTAT_NOTINSTALLED)
+        LOG_INF("DISPLAY\t\tNOT INSTALLED");
+    else if (!device_is_ready(role_devs->dev_display)) {
         LOG_ERR("Display device is not ready");
+        role_devs->dev_display_stat = DEVSTAT_ERR;
         rdy = false;
+    } else {
+        role_devs->dev_display_stat = DEVSTAT_RDY;
+        LOG_INF("DISPLAY\t\tRDY");
     }
-    role_devs->dev_display_stat = DEVSTAT_RDY;
-    LOG_INF("DISPLAY\t\tRDY");
 
     if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("CAN0\t\tNOT INSTALLED");
@@ -218,8 +230,6 @@ static bool init_trc_sdhc() {
     return true;
 }
 
-K_MEM_SLAB_DEFINE(bit_tx_slab, I2S_BLOCK_SIZE, I2S_NUM_BLOCKS, 4);
-
 static bool init_trc_i2s() {
     int ret = device_is_ready(role_devs->dev_i2s);
     if (ret < 0) {
@@ -235,6 +245,14 @@ static bool init_trc_i2s() {
 
 static bool init_trc() {
     bool rdy = true;
+
+    if (role_devs->dev_display_stat == DEVSTAT_RDY && !device_is_ready(role_devs->gpio_blight->port)) {
+        LOG_ERR("TRC Backlight GPIO Dev not ready.");
+        role_devs->dev_display_stat = DEVSTAT_NOT_RDY;
+        role_devs->gpio_blight_stat = DEVSTAT_ERR;
+        rdy = false;
+    } else 
+        role_devs->gpio_blight_stat = DEVSTAT_RDY;
 
     rdy &= init_trc_sdhc();
 

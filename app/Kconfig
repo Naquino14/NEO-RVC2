@@ -24,6 +24,12 @@ config EN_DEV_LORA
     help
         Enable if LoRa transmitter is installed. 
 
+config EN_DEV_DISPLAY
+    bool "Display Installed"
+    default y
+    help
+        Enable if Display is installed. On TRC this enables backlight as well.
+
 config EN_DEV_CAN0
     bool "CAN XCVR 0 installed"
     default y

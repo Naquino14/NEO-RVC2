@@ -114,8 +114,7 @@ bool bit_lora(bool call_resp) {
 }
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-static bool bit_display_st7735(bool wait_sw0)
-{
+static bool bit_display_st7735(bool wait_sw0) {
     if (role_devs->dev_display_stat != DEVSTAT_RDY) {
         LOG_WRN("Display\t\tSKIP");
         return true;
