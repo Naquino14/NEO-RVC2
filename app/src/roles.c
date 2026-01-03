@@ -5,11 +5,15 @@
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
 
+#if CONFIG_EN_GPIO_LED0
 #define LED0_NODE DT_ALIAS(led0)
 const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+#endif
 
+#if CONFIG_EN_GPIO_SW0
 #define SW0_NODE DT_ALIAS(sw0)
 const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
+#endif
 
 #define LORA_NODE DT_NODELABEL(lora0)
 const struct device * const lora = DEVICE_DT_GET(LORA_NODE);
@@ -68,7 +72,7 @@ static const struct fs_mount_t sdcard_mnt_info = {
 };
 
 static role_devs_t m_role_devs = {
-#if CONFIG_EN_DEV_LED0
+#if CONFIG_EN_GPIO_LED0
     .gpio_led0 = &led0,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
 #else
@@ -76,8 +80,13 @@ static role_devs_t m_role_devs = {
     .gpio_led0_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
+#if CONFIG_EN_GPIO_SW0
     .gpio_sw0 = &sw0,
     .gpio_sw0_stat = DEVSTAT_NOT_RDY,
+#else
+    .gpio_sw0 = &sw0,
+    .gpio_sw0_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
     .dev_lora = lora,
     .dev_lora_stat = DEVSTAT_NOT_RDY,
@@ -123,13 +132,17 @@ static bool init_common()
         LOG_INF("LED0\t\tRDY");
     }
     
+    
+    if (role_devs->gpio_led0_stat == DEVSTAT_NOTINSTALLED)
+        LOG_INF("SW0\t\tNOT INSTALLED");
     if (!device_is_ready(role_devs->gpio_sw0->port)) {
         LOG_ERR("User switch device is not ready");
         role_devs->gpio_sw0_stat = DEVSTAT_ERR;
         rdy = false;
+    } else {
+        role_devs->gpio_sw0_stat = DEVSTAT_RDY;
+        LOG_INF("User switch\tRDY");
     }
-    role_devs->gpio_sw0_stat = DEVSTAT_RDY;
-    LOG_INF("User switch\tRDY");
     
     // if (!device_is_ready(lora)) {
     //     LOG_ERR("LoRa device is not ready");
