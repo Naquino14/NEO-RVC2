@@ -15,11 +15,15 @@ const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
 #endif
 
+#if CONFIG_EN_DEV_LORA
 #define LORA_NODE DT_NODELABEL(lora0)
 const struct device * const lora = DEVICE_DT_GET(LORA_NODE);
+#endif
 
-#define CAN_NODE DT_CHOSEN(zephyr_canbus)
+#if CONFIG_EN_DEV_CAN0
+#define CAN_NODE DT_CHOSEN(zephyr_canbus) /// TODO change chosen if second CAN is added
 const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
+#endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 
@@ -71,7 +75,7 @@ static const struct fs_mount_t sdcard_mnt_info = {
     .mnt_point = "/SD:"
 };
 
-static role_devs_t m_role_devs = {
+static role_devs_t m_role_devs_trc = {
 #if CONFIG_EN_GPIO_LED0
     .gpio_led0 = &led0,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
@@ -101,8 +105,13 @@ static role_devs_t m_role_devs = {
     .dev_display_stat = DEVSTAT_NOT_RDY,
     .gpio_blight_stat = DEVSTAT_NOT_RDY,
 
+#if CONFIG_EN_DEV_CAN0
     .dev_can0 = can0,
     .dev_can0_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_can0 = NULL,
+    .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
+#endif
 
     .dev_i2s = i2s,
     .dev_i2s_stat = DEVSTAT_NOT_RDY,
@@ -110,7 +119,7 @@ static role_devs_t m_role_devs = {
     .dev_sdcard_mnt_info = &sdcard_mnt_info,
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
 };
-role_devs_t* role_devs = &m_role_devs;
+role_devs_t* role_devs = &m_role_devs_trc;
 
 #endif
 
@@ -166,15 +175,16 @@ static bool init_common()
     role_devs->dev_display_stat = DEVSTAT_RDY;
     LOG_INF("DISPLAY\t\tRDY");
 
-    // if (!device_is_ready(role_devs->dev_can0)) {
-    //     LOG_ERR("CAN device is not ready");
-    //     role_devs->dev_can0_stat = DEVSTAT_ERR;
-    //     rdy = false;
-    // }
-    // role_devs->dev_can0_stat = DEVSTAT_RDY;
-    // LOG_INF("CAN\t\tRDY");
-    role_devs->dev_can0_stat = DEVSTAT_NOTINSTALLED; // DELETEME temporary can disable
-    LOG_INF("CAN\t\tNOT INSTALLED");
+    if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED)
+        LOG_INF("CAN0\t\tNOT INSTALLED");
+    else if (!device_is_ready(role_devs->dev_can0)) {
+        LOG_ERR("CAN device is not ready");
+        role_devs->dev_can0_stat = DEVSTAT_ERR;
+        rdy = false;
+    } else {
+        role_devs->dev_can0_stat = DEVSTAT_RDY;
+        LOG_INF("CAN\t\tRDY");
+    }
 
     return rdy;
 }

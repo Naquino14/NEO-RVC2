@@ -24,6 +24,14 @@ config EN_DEV_LORA
     help
         Enable if LoRa transmitter is installed. 
 
+config EN_DEV_CAN0
+    bool "CAN XCVR 0 installed"
+    default y
+    help
+        Enable if CAN transceiver 0 is installed. 
+        TODO: When CAN1 added rename them from CANX to which net they are on.
+        Ex: CAN0 -> CAN-OBD; CAN1 -> CAN-ECU or something....
+
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"
 endmenu
