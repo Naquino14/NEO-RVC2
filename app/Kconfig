@@ -1,10 +1,10 @@
 config DEVICE_ROLE
-int "DEVICE_ROLE | 1: FOB, 2: TRC"
-range 1 2
-default 1 if CONFIG_BOARD_HELTEC_WIFI_LORA32_v3
-default 2 if CONFIG_BOARD_HELTEC_HTIT_TRACKER
-help
-    Set device role, 1: fob-commander-transmitter, 2: tracker-controller-transponder
+    int "DEVICE_ROLE | 1: FOB, 2: TRC"
+    range 1 2
+    default 1 if CONFIG_BOARD_HELTEC_WIFI_LORA32_v3
+    default 2 if CONFIG_BOARD_HELTEC_HTIT_TRACKER
+    help
+        Set device role, 1: fob-commander-transmitter, 2: tracker-controller-transponder
 
 config EN_GPIO_LED0
     bool "LED0 Installed"
