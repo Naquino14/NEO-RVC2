@@ -32,12 +32,20 @@ menu "Installed Devices"
             Enable if Display is installed. On TRC this enables backlight as well.
 
     config EN_DEV_CAN0
-        bool "CAN XCVR 0 installed"
+        bool "CAN XCVR 0 Installed"
         default y
         help
             Enable if CAN transceiver 0 is installed. 
             TODO: When CAN1 added rename them from CANX to which net they are on.
             Ex: CAN0 -> CAN-OBD; CAN1 -> CAN-ECU or something....
+    
+    if DEVICE_ROLE = 2 
+        config EN_DEV_I2S
+        bool "I2S Amp Installed"
+        default y
+        help
+            Enable if I2S Amplifier is installed.
+    endif
 endmenu 
 
 menu "Zephyr Kernel"

@@ -66,8 +66,10 @@ const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 #endif
 
+#if CONFIG_EN_DEV_I2S
 #define I2S_NODE DT_ALIAS(i2s_tx)
 const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
+#endif
 
 static FATFS sd_fs_fat_info;
 static const struct fs_mount_t sdcard_mnt_info = {
@@ -121,8 +123,13 @@ static role_devs_t m_role_devs_trc = {
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
 #endif
 
+#if CONFIG_EN_DEV_I2S
     .dev_i2s = i2s,
     .dev_i2s_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_i2s = NULL,
+    .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
     .dev_sdcard_mnt_info = &sdcard_mnt_info,
     .dev_sdcard_stat = DEVSTAT_NOT_RDY
@@ -167,7 +174,7 @@ static bool init_common()
     
     if (role_devs->dev_lora_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("LORA\t\tNOT INSTALLED");
-    else if (!device_is_ready(lora)) {
+    else if (!device_is_ready(role_devs->dev_lora)) {
         LOG_ERR("LoRa device is not ready");
         role_devs->dev_lora_stat = DEVSTAT_ERR;
         rdy = false;
@@ -231,6 +238,11 @@ static bool init_trc_sdhc() {
 }
 
 static bool init_trc_i2s() {
+    if (role_devs->dev_i2s_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("I2S\t\tNOT INSTALLED");
+        return true;
+    }
+
     int ret = device_is_ready(role_devs->dev_i2s);
     if (ret < 0) {
         LOG_ERR("I2S device is not ready");
