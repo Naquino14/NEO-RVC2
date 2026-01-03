@@ -6,6 +6,12 @@ default 2 if CONFIG_BOARD_HELTEC_HTIT_TRACKER
 help
     Set device role, 1: fob-commander-transmitter, 2: tracker-controller-transponder
 
+config EN_DEV_LED0
+    bool "LED0 Installed"
+    default y
+    help
+        Enable if LED0 is installed.
+
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"
 endmenu

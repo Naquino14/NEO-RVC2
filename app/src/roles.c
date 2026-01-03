@@ -6,7 +6,7 @@ const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
 
 #define LED0_NODE DT_ALIAS(led0)
-const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 #define SW0_NODE DT_ALIAS(sw0)
 const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
@@ -23,7 +23,7 @@ const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
 const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
 
 static const role_devs_t m_role_devs = {
-    .gpio_led0 = &led,
+    .gpio_led0 = &led0,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
 
     .gpio_sw0 = &sw0,
@@ -68,8 +68,13 @@ static const struct fs_mount_t sdcard_mnt_info = {
 };
 
 static role_devs_t m_role_devs = {
-    .gpio_led0 = &led,
+#if CONFIG_EN_DEV_LED0
+    .gpio_led0 = &led0,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
+#else
+    .gpio_led0 = NULL,
+    .gpio_led0_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
     .gpio_sw0 = &sw0,
     .gpio_sw0_stat = DEVSTAT_NOT_RDY,
@@ -107,13 +112,16 @@ static bool init_common()
 
     bool rdy = true;
 
-    if (!device_is_ready(role_devs->gpio_led0->port)) {
+    if (role_devs->gpio_led0_stat == DEVSTAT_NOTINSTALLED)
+        LOG_INF("LED0\t\tNOT INSTALLED");
+    else if (!device_is_ready(role_devs->gpio_led0->port)) {
         LOG_ERR("LED device is not ready");
         role_devs->gpio_led0_stat = DEVSTAT_ERR;
         rdy = false;
+    } else {
+        role_devs->gpio_led0_stat = DEVSTAT_RDY;
+        LOG_INF("LED0\t\tRDY");
     }
-    role_devs->gpio_led0_stat = DEVSTAT_RDY;
-    LOG_INF("LED\t\tRDY");
     
     if (!device_is_ready(role_devs->gpio_sw0->port)) {
         LOG_ERR("User switch device is not ready");
