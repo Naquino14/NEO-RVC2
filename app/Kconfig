@@ -1,10 +1,58 @@
 config DEVICE_ROLE
-int "DEVICE_ROLE | 1: FOB, 2: TRC"
-range 1 2
-default 1 if CONFIG_BOARD_HELTEC_WIFI_LORA32_v3
-default 2 if CONFIG_BOARD_HELTEC_HTIT_TRACKER
-help
-    Set device role, 1: fob-commander-transmitter, 2: tracker-controller-transponder
+    int "DEVICE_ROLE | 1: FOB, 2: TRC"
+    range 1 2
+    default 1 if CONFIG_BOARD_HELTEC_WIFI_LORA32_v3
+    default 2 if CONFIG_BOARD_HELTEC_HTIT_TRACKER
+    help
+        Set device role, 1: fob-commander-transmitter, 2: tracker-controller-transponder
+
+menu "Installed Devices"
+    config EN_GPIO_LED0
+        bool "LED0 Installed"
+        default y
+        help
+            Enable if LED 0 is installed.
+
+    config EN_GPIO_SW0
+        bool "SW0 Installed"
+        default y
+        help
+            Enable if Switch 0 is installed.
+
+    config EN_DEV_LORA
+        bool "LORA Installed"
+        default y
+        help
+            Enable if LoRa transmitter is installed. 
+
+    config EN_DEV_DISPLAY
+        bool "Display Installed"
+        default y
+        help
+            Enable if Display is installed. On TRC this enables backlight as well.
+
+    config EN_DEV_CAN0
+        bool "CAN XCVR 0 Installed"
+        default y
+        help
+            Enable if CAN transceiver 0 is installed. 
+            TODO: When CAN1 added rename them from CANX to which net they are on.
+            Ex: CAN0 -> CAN-OBD; CAN1 -> CAN-ECU or something....
+    
+    config EN_DEV_SDHC
+        bool "SD Card Installed"
+        default y
+        help
+            Enable if SD Card/Reader is installed.
+    
+    if DEVICE_ROLE = 2 
+        config EN_DEV_I2S
+            bool "I2S Amp Installed"
+            default y
+            help
+                Enable if I2S Amplifier is installed.
+    endif
+endmenu 
 
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"

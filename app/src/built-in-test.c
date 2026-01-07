@@ -26,7 +26,7 @@ static bool sw0_ok = false;
 static struct gpio_callback sw0_cb_data;
 static void button_pressed(const struct device* dev, struct gpio_callback *cb, uint32_t pins) {
     if (!sw0_ok)
-        LOG_INF("User switch\t\tOK");
+        LOG_INF("SW0\t\tOK");
     k_sem_give(&sw0_sem);
     sw0_ok = true;
 }
@@ -110,79 +110,6 @@ bool bit_lora(bool call_resp) {
     }
 
     LOG_INF("LoRa\t\tOK");
-    return true;
-}
-
-#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-static bool bit_display_st7735(bool wait_sw0)
-{
-    if (role_devs->dev_display_stat != DEVSTAT_RDY) {
-        LOG_WRN("Display\t\tSKIP");
-        return true;
-    }
-
-    int width = DT_PROP(DT_CHOSEN(zephyr_display), width);
-    int height = DT_PROP(DT_CHOSEN(zephyr_display), height);
-    
-    struct display_capabilities capabilities;
-    display_get_capabilities(role_devs->dev_display, &capabilities);
-
-    struct display_buffer_descriptor fbuf_descr = {
-        .width = 1,
-        .height = 1,
-        .pitch = 1
-    };
-
-    if (ROLE_IS_TRC) {
-        gpio_pin_set_dt(role_devs->gpio_blight, true);
-        fbuf_descr.buf_size = sizeof(uint16_t);
-    } else 
-        fbuf_descr.buf_size = sizeof(uint8_t);
-
-    bool second = false;
-    do {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                bool off = (x + y) % 2 == 0;
-                off = second ? off : !off;
-
-                // compute pixel color bit
-                #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
-                const uint8_t pixel = off ? 0x00 : 0xFF; 
-                #else
-                const uint16_t pixel = off ? 0x0000 : 0xFFFF;
-                #endif
-
-                // set pixel
-                int ret = display_write(role_devs->dev_display, x, y, &fbuf_descr, &pixel);
-
-                if (ret < 0) {
-                    LOG_ERR("Display write failed: %d", ret);
-
-                    if (ROLE_IS_TRC)
-                        gpio_pin_set_dt(role_devs->gpio_blight, false);
-                    
-                    role_devs->dev_display_stat = DEVSTAT_ERR;
-                    return false;
-                }
-            }
-        }
-        
-        if (wait_sw0) 
-            k_sem_take(&sw0_sem, K_FOREVER);
-        else
-            k_msleep(1000);
-
-        // clear display now 
-        display_blanking_on(role_devs->dev_display);
-        display_blanking_off(role_devs->dev_display);
-
-    } while ((second = !second));
-
-    if (ROLE_IS_TRC)
-        gpio_pin_set_dt(role_devs->gpio_blight, false);
-
-    LOG_INF("Display\t\tOK");
     return true;
 }
 
@@ -281,6 +208,78 @@ static bool bit_sdhc() {
     return true;
 }
 
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+static bool bit_display_st7735(bool wait_sw0) {
+    if (role_devs->dev_display_stat != DEVSTAT_RDY) {
+        LOG_WRN("Display\t\tSKIP");
+        return true;
+    }
+
+    int width = DT_PROP(DT_CHOSEN(zephyr_display), width);
+    int height = DT_PROP(DT_CHOSEN(zephyr_display), height);
+    
+    struct display_capabilities capabilities;
+    display_get_capabilities(role_devs->dev_display, &capabilities);
+
+    struct display_buffer_descriptor fbuf_descr = {
+        .width = 1,
+        .height = 1,
+        .pitch = 1
+    };
+
+    if (ROLE_IS_TRC) {
+        gpio_pin_set_dt(role_devs->gpio_blight, true);
+        fbuf_descr.buf_size = sizeof(uint16_t);
+    } else 
+        fbuf_descr.buf_size = sizeof(uint8_t);
+
+    bool second = false;
+    do {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                bool off = (x + y) % 2 == 0;
+                off = second ? off : !off;
+
+                // compute pixel color bit
+                #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
+                const uint8_t pixel = off ? 0x00 : 0xFF; 
+                #else
+                const uint16_t pixel = off ? 0x0000 : 0xFFFF;
+                #endif
+
+                // set pixel
+                int ret = display_write(role_devs->dev_display, x, y, &fbuf_descr, &pixel);
+
+                if (ret < 0) {
+                    LOG_ERR("Display write failed: %d", ret);
+
+                    if (ROLE_IS_TRC)
+                        gpio_pin_set_dt(role_devs->gpio_blight, false);
+                    
+                    role_devs->dev_display_stat = DEVSTAT_ERR;
+                    return false;
+                }
+            }
+        }
+        
+        if (wait_sw0) 
+            k_sem_take(&sw0_sem, K_FOREVER);
+        else
+            k_msleep(1000);
+
+        // clear display now 
+        display_blanking_on(role_devs->dev_display);
+        display_blanking_off(role_devs->dev_display);
+
+    } while ((second = !second));
+
+    if (ROLE_IS_TRC)
+        gpio_pin_set_dt(role_devs->gpio_blight, false);
+
+    LOG_INF("Display\t\tOK");
+    return true;
+}
+
 static bool bit_i2s() {
     if (role_devs->dev_i2s_stat != DEVSTAT_RDY) {
         LOG_WRN("I2S\t\tSKIP");
@@ -288,6 +287,7 @@ static bool bit_i2s() {
     }
 
     if (role_devs->dev_sdcard_stat != DEVSTAT_RDY) {
+        LOG_INF("I2S BIT SDHC NOT INSTALLED");
         LOG_WRN("I2S\t\tSKIP");
         return true;
     }
@@ -383,8 +383,6 @@ bool bit_role_specific_basic() {
     bool ok = true;
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-    if (!bit_sdhc())
-        ok = false;
     
     if (!bit_i2s())
         ok = false;
@@ -432,6 +430,8 @@ bool bit_basic() {
     ok &= bit_lora(false);
     
     ok &= bit_display(false);
+
+    ok &= bit_sdhc();
 
     // device specific BIT
     ok &= bit_role_specific_basic();

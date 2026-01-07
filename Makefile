@@ -56,3 +56,19 @@ clean:
 
 show:
 	@echo CWD: $(CWD)
+	@echo Board Device: $(BOARD_DEV)
+	
+	@if [ -f build/app/zephyr/.config ]; then \
+		echo "Installed devices:"; \
+		grep 'CONFIG_EN_DEV_' build/app/zephyr/.config; \
+		if grep -q 'CONFIG_DEVICE_ROLE=1' build/app/zephyr/.config; then \
+			echo "Current build target: FOB"; \
+		elif grep -q 'CONFIG_DEVICE_ROLE=2' build/app/zephyr/.config; then \
+			echo "Current build target: TRC"; \
+		else \
+			echo "No build target found"; \
+		fi; \
+	else \
+		echo "No build present."; \
+	fi
+

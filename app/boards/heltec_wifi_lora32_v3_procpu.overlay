@@ -11,11 +11,11 @@
 &pinctrl {
     spim2_default: spim2_default {
 		group1 {
-			pinmux = <SPIM2_MISO_GPIO40>,
+			pinmux = <SPIM2_MISO_GPIO41>,
 				 <SPIM2_SCLK_GPIO39>;
 		};
 		group2 {
-			pinmux = <SPIM2_MOSI_GPIO41>;
+			pinmux = <SPIM2_MOSI_GPIO40>;
 			output-low;
 		};
 	};
@@ -27,13 +27,26 @@
     status = "okay";
     pinctrl-0 = <&spim2_default>;
     pinctrl-names = "default";
-    cs-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>; // GPIO 46 == GPIO1 14
+    cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>, // SD card GPIO 42 == GPIO1 10
+        <&gpio1 13 GPIO_ACTIVE_LOW>; // CAN module GPIO 45 == GPIO1 13
 
-    can_over_spi: can@0 {
-        compatible = "microchip,mcp2515";
+    sdhc_card: sdhc@0 {
+        compatible = "zephyr,sdhc-spi-slot";
         reg = <0>;
+        status = "okay";
+        mmc {
+            compatible = "zephyr,sdmmc-disk";
+            disk-name = "SD";
+            status = "okay";
+        };
+        spi-max-frequency = <DT_FREQ_M(18)>;
+    };
+
+    can_over_spi: can@1 {
+        compatible = "microchip,mcp2515";
+        reg = <1>;
         osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>; // GPIO 45 == GPIO1 13
+        int-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>; // GPIO 38 == GPIO1 6
         spi-max-frequency = <DT_FREQ_M(4)>; // might be wrong, just a guess
     };
 };
