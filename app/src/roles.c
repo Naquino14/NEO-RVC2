@@ -1,6 +1,8 @@
 #include "roles.h"
 
 #include <zephyr/logging/log.h>
+#include <zephyr/fs/fs.h>
+#include <zephyr/storage/disk_access.h>
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
@@ -27,35 +29,66 @@ const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 
+#if CONFIG_EN_DEV_DISPLAY
 #define DISPLAY_NODE DT_NODELABEL(ssd1306)
-const struct device *display = DEVICE_DT_GET(DISPLAY_NODE);
+const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
+#endif
 
-static const role_devs_t m_role_devs = {
+static role_devs_t m_role_devs_fob = {
+#if CONFIG_EN_GPIO_LED0
     .gpio_led0 = &led0,
     .gpio_led0_stat = DEVSTAT_NOT_RDY,
+#else
+    .gpio_led0 = NULL,
+    .gpio_led0_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
+#if CONFIG_EN_GPIO_SW0
     .gpio_sw0 = &sw0,
     .gpio_sw0_stat = DEVSTAT_NOT_RDY,
+#else
+    .gpio_sw0 = &sw0,
+    .gpio_sw0_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
-    .dev_lora = &lora,
+#if CONFIG_EN_DEV_LORA
+    .dev_lora = lora,
     .dev_lora_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_lora = NULL,
+    .dev_lora_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
-    .dev_display = &display,
+#if CONFIG_EN_DEV_DISPLAY
+    .dev_display = display,
     .gpio_blight = NULL,
     .dev_display_stat = DEVSTAT_NOT_RDY,
     .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
+#else
+    .dev_display = NULL,
+    .gpio_blight = NULL,
+    .dev_display_stat = DEVSTAT_NOTINSTALLED,
+    .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
+#endif
 
-    .dev_can0 = &can0,
+#if CONFIG_EN_DEV_CAN0
+    .dev_can0 = can0,
     .dev_can0_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_can0 = NULL,
+    .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
+#endif
 
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
-    // .i2s_cfg = NULL,
 
-    .dev_sdcard_mnt_info = NULL,
+#if CONFIG_EN_DEV_SDHC
+    .dev_sdcard_stat = DEVSTAT_NOT_RDY,
+#else
     .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+#endif
 };
-const role_devs_t* role_devs = &m_role_devs;
+role_devs_t* role_devs = &m_role_devs_fob;
 
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 
@@ -145,6 +178,7 @@ static bool init_common()
 
     bool rdy = true;
 
+    // LED0
     if (role_devs->gpio_led0_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("LED0\t\tNOT INSTALLED");
     else if (!device_is_ready(role_devs->gpio_led0->port)) {
@@ -156,8 +190,8 @@ static bool init_common()
         LOG_INF("LED0\t\tRDY");
     }
     
-    
-    if (role_devs->gpio_led0_stat == DEVSTAT_NOTINSTALLED)
+    // SW0
+    if (role_devs->gpio_sw0_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("SW0\t\tNOT INSTALLED");
     if (!device_is_ready(role_devs->gpio_sw0->port)) {
         LOG_ERR("User switch device is not ready");
@@ -168,6 +202,7 @@ static bool init_common()
         LOG_INF("SW0\t\tRDY");
     }
     
+    // LORA
     if (role_devs->dev_lora_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("LORA\t\tNOT INSTALLED");
     else if (!device_is_ready(role_devs->dev_lora)) {
@@ -179,6 +214,7 @@ static bool init_common()
         LOG_INF("LORA\t\tRDY");
     }
 
+    // Display
     if (role_devs->dev_display_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("DISPLAY\t\tNOT INSTALLED");
     else if (!device_is_ready(role_devs->dev_display)) {
@@ -190,6 +226,7 @@ static bool init_common()
         LOG_INF("DISPLAY\t\tRDY");
     }
 
+    // CAN0
     if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED)
         LOG_INF("CAN0\t\tNOT INSTALLED");
     else if (!device_is_ready(role_devs->dev_can0)) {
@@ -201,40 +238,41 @@ static bool init_common()
         LOG_INF("CAN\t\tRDY");
     }
 
+    // SDHC
+    if (role_devs->dev_sdcard_stat == DEVSTAT_NOTINSTALLED) 
+        LOG_INF("SDHC\t\tNOT INSTALLED");
+    else {
+        do {
+            const char* disk_pdrv = "SD";
+
+            int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
+
+            if (ret < 0) {
+                LOG_ERR("SD card init failed: storage init error %d", ret);
+                role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+                rdy = false;
+                break;
+            }
+
+            k_msleep(2);
+
+            ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_DEINIT, NULL);
+            if (ret < 0) {
+                LOG_ERR("SD card init failed: storage deinit error %d", ret);
+                role_devs->dev_sdcard_stat = DEVSTAT_ERR;
+                rdy = false;
+                break;
+            }
+
+            role_devs->dev_sdcard_stat = DEVSTAT_RDY;  
+            LOG_INF("SDHC\t\tRDY");
+        } while (false);
+    }
+
     return rdy;
 }
 
 static bool init_fob() {
-    return true;
-}
-
-static bool init_trc_sdhc() {
-    if (role_devs->dev_sdcard_stat == DEVSTAT_NOTINSTALLED) {
-        LOG_INF("SDHC\t\tNOT INSTALLED");
-        return true;
-    }
-
-    const char* disk_pdrv = "SD";
-
-    int ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
-    if (ret < 0) {
-        LOG_ERR("SD card init failed: storage init error %d", ret);
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-        return false;
-    }
-
-    k_msleep(10);
-
-    ret = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_DEINIT, NULL);
-    if (ret < 0) {
-        LOG_ERR("SD card init failed: storage deinit error %d", ret);
-        role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-        return false;
-    }
-
-    role_devs->dev_sdcard_stat = DEVSTAT_RDY;  
-    LOG_INF("SDHC\t\tRDY");
-
     return true;
 }
 
@@ -266,8 +304,6 @@ static bool init_trc() {
         rdy = false;
     } else 
         role_devs->gpio_blight_stat = DEVSTAT_RDY;
-
-    rdy &= init_trc_sdhc();
 
     rdy &= init_trc_i2s();
 

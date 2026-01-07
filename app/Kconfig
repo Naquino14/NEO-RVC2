@@ -39,18 +39,18 @@ menu "Installed Devices"
             TODO: When CAN1 added rename them from CANX to which net they are on.
             Ex: CAN0 -> CAN-OBD; CAN1 -> CAN-ECU or something....
     
+    config EN_DEV_SDHC
+        bool "SD Card Installed"
+        default y
+        help
+            Enable if SD Card/Reader is installed.
+    
     if DEVICE_ROLE = 2 
         config EN_DEV_I2S
             bool "I2S Amp Installed"
             default y
             help
                 Enable if I2S Amplifier is installed.
-        
-        config EN_DEV_SDHC
-            bool "SD Card Installed"
-            default y
-            help
-                Enable if SD Card/Reader is installed.
     endif
 endmenu 
 

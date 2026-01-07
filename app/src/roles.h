@@ -8,10 +8,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/linker/linker-defs.h>
-#include <zephyr/fs/fs.h>
-#include <zephyr/storage/disk_access.h>
-#include <ff.h>
-#include <zephyr/drivers/i2s.h>
 
 extern const char* FOB_STR;
 extern const char* TRC_STR;
