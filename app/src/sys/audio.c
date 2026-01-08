@@ -149,8 +149,8 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     if (!nrvc2_storage_is_mounted())
         return -ESTORAGENOTMOUNTED;
 
-    wav_file_t master_caution_wav;
-    int ret = open_parse_wav(filename, &master_caution_wav);
+    wav_file_t playing_wav;
+    int ret = open_parse_wav(filename, &playing_wav);
     if (ret < 0)
         return ret; // dont consider opening/parsing errors to disable I2S system
     
@@ -160,15 +160,15 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
         return ret;
 
     // set params
-    i2s_cfg.word_size = master_caution_wav.bits_per_sample;
-    i2s_cfg.channels = master_caution_wav.num_channels;
-    i2s_cfg.frame_clk_freq = master_caution_wav.sample_rate;
+    i2s_cfg.word_size = playing_wav.bits_per_sample;
+    i2s_cfg.channels = playing_wav.num_channels;
+    i2s_cfg.frame_clk_freq = playing_wav.sample_rate;
 
     ret = i2s_configure(role_devs->dev_i2s, I2S_DIR_TX, &i2s_cfg);
     if (ret < 0) {
         LOG_ERR("I2S BIT SD i2s configure failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem); 
         return ret;
     }
@@ -180,20 +180,20 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     int blockno = 0;
 
     // check if data is 16 bit unsigned PCM
-    if (master_caution_wav.bits_per_sample != 16) {
-        LOG_ERR("I2S BIT SD unsupported bits per sample %d", master_caution_wav.bits_per_sample);
+    if (playing_wav.bits_per_sample != 16) {
+        LOG_ERR("I2S BIT SD unsupported bits per sample %d", playing_wav.bits_per_sample);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem); 
         return -ENOTSUP;
     } 
 
     // prime i2s fifo with first block
-    ret = fs_read(&master_caution_wav.wav_file, audio_buf, sizeof(audio_buf));
+    ret = fs_read(&playing_wav.wav_file, audio_buf, sizeof(audio_buf));
     if (ret < 0) {
         LOG_ERR("I2S read file failed :( %d", ret);
         // error doesnt need to disable I2S or SD storage
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         nrvc2_fs_unmount();
         k_sem_give(&i2s_dev_sem); 
         return ret;
@@ -210,7 +210,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
         if (ret < 0) {
             // error doesnt necessarily need to disable I2S
             LOG_ERR("I2S TX mem slab alloc for small buf failed: %d", ret);
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             k_sem_give(&i2s_dev_sem); 
             return ret;
         }
@@ -221,7 +221,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
             LOG_ERR("I2S write small buf to dev failed: %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]); // best effort slab free
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             k_sem_give(&i2s_dev_sem); 
             return ret;
         }
@@ -232,7 +232,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
             LOG_ERR("I2S trigger start for small buf failed: %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             nrvc2_fs_unmount();
             k_sem_give(&i2s_dev_sem); 
             return ret;
@@ -245,13 +245,13 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
             LOG_ERR("I2S trigger drain for small buf failed: %d", ret);
             // error doesnt necessarily need to disable I2S
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]); // best effort slab free
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             k_sem_give(&i2s_dev_sem); 
             return ret;
         }
 
         k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
-        ret = fs_close(&master_caution_wav.wav_file);
+        ret = fs_close(&playing_wav.wav_file);
         if (ret < 0) {
             LOG_ERR("I2S BIT SD close read test file failed");
             role_devs->dev_sdcard_stat = DEVSTAT_ERR;
@@ -268,7 +268,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     if (ret < 0) {
         LOG_ERR("I2S BIT SD mem slab alloc failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem); 
         return ret;
     }
@@ -279,7 +279,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
         LOG_ERR("I2S write to dev failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
         k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem); 
         return ret;
     }
@@ -290,7 +290,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     if (ret < 0) {
         LOG_ERR("I2S trigger start failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem); 
         return ret;
     }
@@ -302,21 +302,21 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     // might be able to pass true size of final block to i2s_write
     for (;;) { 
         // check if end of file reached
-        off_t file_pos = fs_tell(&master_caution_wav.wav_file);
-        if (file_pos >= master_caution_wav.filesize)
+        off_t file_pos = fs_tell(&playing_wav.wav_file);
+        if (file_pos >= playing_wav.filesize)
             break;
         
         // check difference betweeen file pos and filesize
-        off_t diff = master_caution_wav.filesize - file_pos;
+        off_t diff = playing_wav.filesize - file_pos;
 
         // if difference is less than buffer size, read only remaining data
         size_t to_read = diff > sizeof(audio_buf) ? sizeof(audio_buf) : diff;
         
-        ret = fs_read(&master_caution_wav.wav_file, audio_buf, to_read);
+        ret = fs_read(&playing_wav.wav_file, audio_buf, to_read);
         if (ret < 0) {
             LOG_ERR("I2S BIT SD mastercautiom.wav read failed :( %d", ret);
             role_devs->dev_sdcard_stat = DEVSTAT_ERR;
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             nrvc2_fs_unmount();
             k_sem_give(&i2s_dev_sem); 
             return ret;
@@ -331,7 +331,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
         if (ret < 0) {
             LOG_ERR("I2S BIT SD mem slab alloc failed (may have timed out): %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             k_sem_give(&i2s_dev_sem);
             return ret;
         }
@@ -342,7 +342,7 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
             LOG_ERR("I2S write to dev failed: %d", ret);
             role_devs->dev_i2s_stat = DEVSTAT_ERR;
             k_mem_slab_free(&i2s_tx_slab, (void**)&tx_block[blockno]);
-            fs_close(&master_caution_wav.wav_file);
+            fs_close(&playing_wav.wav_file);
             k_sem_give(&i2s_dev_sem);
             return ret;
         }
@@ -356,14 +356,14 @@ int audio_play_file_blocking(const char* filename, k_timeout_t busy_timeout) {
     if (ret < 0) {
         LOG_ERR("I2S trigger drain failed: %d", ret);
         role_devs->dev_i2s_stat = DEVSTAT_ERR;
-        fs_close(&master_caution_wav.wav_file);
+        fs_close(&playing_wav.wav_file);
         k_sem_give(&i2s_dev_sem);
         return ret;
     }
 
     k_msleep(1);
 
-    ret = fs_close(&master_caution_wav.wav_file);
+    ret = fs_close(&playing_wav.wav_file);
     if (ret < 0) {
         k_sem_give(&i2s_dev_sem);
         return ret;
