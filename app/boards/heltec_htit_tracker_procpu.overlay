@@ -3,6 +3,7 @@
         can0 = &can_over_spi;
         sdhc0 = &sdhc_card;
         i2s-tx = &i2s0;
+        gnss = &ufirebirdii_gnss;
     };
 
     chosen {
@@ -27,6 +28,14 @@
 
     dmas = <&dma 3>;
     dma-names = "tx";
+};
+
+&uart1 {
+    ufirebirdii_gnss: ufirebirdii_gnss {
+        compatible = "unicore,uc6580";
+        status = "okay";
+        current-speed = <115200>;
+    };
 };
 
 &dma {

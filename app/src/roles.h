@@ -56,6 +56,9 @@ typedef struct  {
    devstat_t dev_i2s_stat;
 
    devstat_t dev_sdcard_stat;
+
+   const struct device *dev_gnss;
+   devstat_t dev_gnss_stat;
 } role_devs_t;
 
 extern role_devs_t* role_devs;

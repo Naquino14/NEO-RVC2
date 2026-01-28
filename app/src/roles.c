@@ -87,6 +87,8 @@ static role_devs_t m_role_devs_fob = {
 #else
     .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
 #endif
+
+    .dev_gnss_stat = DEVSTAT_NOTINSTALLED
 };
 role_devs_t* role_devs = &m_role_devs_fob;
 
@@ -102,6 +104,11 @@ const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 #if CONFIG_EN_DEV_I2S
 #define I2S_NODE DT_ALIAS(i2s_tx)
 const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
+#endif
+
+#if CONFIG_EN_DEV_GNSS
+#define GNSS_NODE DT_ALIAS(gnss)
+const struct device * const gnss = DEVICE_DT_GET(GNSS_NODE);
 #endif
 
 static role_devs_t m_role_devs_trc = {
@@ -158,9 +165,17 @@ static role_devs_t m_role_devs_trc = {
 #endif
 
 #if CONFIG_EN_DEV_SDHC
-    .dev_sdcard_stat = DEVSTAT_NOT_RDY
+    .dev_sdcard_stat = DEVSTAT_NOT_RDY,
 #else
-    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED,
+#endif
+
+#if CONFIG_EN_DEV_GNSS
+    .dev_gnss = gnss,
+    .dev_gnss_stat = DEVSTAT_NOT_RDY
+#else
+    .dev_gnss = NULL,
+    .dev_gnss_stat = DEVSTAT_NOTINSTALLED
 #endif
 };
 role_devs_t* role_devs = &m_role_devs_trc;
@@ -294,6 +309,24 @@ static bool init_trc_i2s() {
     return true;
 }
 
+static bool init_trc_gnss() {
+    if (role_devs->dev_gnss_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("GNSS\t\tNOT INSTALLED");
+        return true;
+    }
+
+    int ret = device_is_ready(role_devs->dev_gnss);
+    if (ret < 0) {
+        LOG_ERR("GNSS device is not ready");
+        role_devs->dev_gnss_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_gnss_stat = DEVSTAT_RDY;
+    LOG_INF("GNSS\t\tRDY");
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
@@ -306,6 +339,7 @@ static bool init_trc() {
         role_devs->gpio_blight_stat = DEVSTAT_RDY;
 
     rdy &= init_trc_i2s();
+    rdy &= init_trc_gnss();
 
     return rdy;
 }
