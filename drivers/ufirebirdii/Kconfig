@@ -1,6 +1,11 @@
 # Copyright (c) 2021 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
+config UFIREBIRDII
+    bool "UFirebirdII GNSS Device Family Support"
+    help
+      Enable support for the UFirebirdII GNSS device family.
+
 if UFIREBIRDII
 rsource "uc6580/Kconfig"
 endif 
