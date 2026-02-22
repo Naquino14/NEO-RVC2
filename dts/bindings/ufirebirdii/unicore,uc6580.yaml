@@ -1,0 +1,12 @@
+description: |
+    The Unicore UC6580 is a dual-frequency, multi-constellation GNSS SoC.
+
+compatible: "unicore,uc6580"
+
+include: uart-device.yaml
+
+properties:
+    pps-gpios:
+        type: phandle-array
+        description: "GPIO pin for PPS signal"
+        required: false
