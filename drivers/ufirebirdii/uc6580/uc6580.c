@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <zephyr/logging/log.h>
 
-#include "unicore_uc6580.h"
+#include "uc6580.h"
 
 LOG_MODULE_REGISTER(uc6580);
 

@@ -1,0 +1,8 @@
+# Copyright (C) 2026 Nate Aquino
+# SPDX-License-Identifier: Apache-2.0
+
+config UC6580
+    bool "Unicore UC6580"
+    select UART
+    help
+        Enable support for the Unicore UC6580 GNSS receiver. 
