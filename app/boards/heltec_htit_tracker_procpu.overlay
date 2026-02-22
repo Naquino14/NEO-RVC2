@@ -42,7 +42,6 @@
     uc6580: uc6580 {
         compatible = "unicore,uc6580";
         status = "okay";
-        current-speed = <115200>;
     };
 };
 
