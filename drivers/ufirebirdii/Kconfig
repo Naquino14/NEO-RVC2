@@ -2,5 +2,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
 if UFIREBIRDII
-rsource "example_ufirebirdii/Kconfig"
+rsource "uc6580/Kconfig"
 endif 
