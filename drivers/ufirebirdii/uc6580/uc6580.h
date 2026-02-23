@@ -4,7 +4,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/uart.h>
 
-#include <include/drivers/ufirebirdii.h>
+#include <drivers/ufirebirdii.h>
 
 struct uc6580_config {
     const struct device* uart;
