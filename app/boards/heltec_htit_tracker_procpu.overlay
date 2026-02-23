@@ -7,7 +7,6 @@
 
     chosen {
         zephyr,canbus = &can_over_spi;
-        zephyr,console = &cdc_acm_uart0;
     };
 };
 
@@ -32,12 +31,6 @@
 
 &dma {
     status = "okay";
-};
-
-&uart0 {
-    cdc_acm_uart0: cdc_acm_uart0 {
-        compatible = "zephyr,cdc-acm-uart";
-    };
 };
 
 &uart1 {

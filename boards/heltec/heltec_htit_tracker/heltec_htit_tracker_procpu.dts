@@ -27,6 +27,12 @@
 		blight = &blight;
 	};
 
+	chosen {
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+		zephyr,bt-hci = &esp32_bt_hci;
+	};
+
 	leds {
 		compatible = "gpio-leds";
 		led0: led {
@@ -100,6 +106,11 @@
 	current-speed = <115200>;
 	pinctrl-0 = <&uart0_default>;
 	pinctrl-names = "default";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		status = "okay";
+	};
 };
 
 &uart1 {
