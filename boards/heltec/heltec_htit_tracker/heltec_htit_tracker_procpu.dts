@@ -126,6 +126,7 @@
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
     lora0: lora@0 {
         compatible = "semtech,sx1262";
+		status = "okay";
         reg = <0>;
         reset-gpios = <&gpio0 12 (GPIO_OPEN_DRAIN | GPIO_ACTIVE_LOW)>;
         busy-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;

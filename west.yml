@@ -17,3 +17,4 @@ manifest:
           - hal_espressif
           - mbedtls
           - mcuboot
+          - loramac-node
