@@ -85,7 +85,7 @@ static role_devs_t m_role_devs_fob = {
 #if CONFIG_EN_DEV_SDHC
     .dev_sdcard_stat = DEVSTAT_NOT_RDY,
 #else
-    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
     .dev_gnss = NULL,
@@ -166,9 +166,9 @@ static role_devs_t m_role_devs_trc = {
 #endif
 
 #if CONFIG_EN_DEV_SDHC
-    .dev_sdcard_stat = DEVSTAT_NOT_RDY
+    .dev_sdcard_stat = DEVSTAT_NOT_RDY,
 #else
-    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED
+    .dev_sdcard_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
 #if CONFIG_EN_DEV_GNSS
