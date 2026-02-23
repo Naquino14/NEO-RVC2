@@ -18,3 +18,5 @@ manifest:
           - mbedtls
           - mcuboot
           - loramac-node
+          - fatfs
+          - lvgl
