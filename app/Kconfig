@@ -51,6 +51,12 @@ menu "Installed Devices"
             default y
             help
                 Enable if I2S Amplifier is installed.
+        
+        config EN_DEV_GNSS
+            bool "GNSS Installed"
+            default y
+            help
+                Enable if GNSS receiver is installed.
     endif
 endmenu 
 
