@@ -16,7 +16,7 @@ typedef struct {
 struct ufirebirdii_api {
     int (*start)(const struct device* dev);
     int (*stop)(const struct device* dev);
-    int (*get_fix)(const struct device* dev);
+    int (*get_fix)(const struct device* dev, ufirebirdii_fix_t* fix);
 };
 
 static inline int ufirebirdii_start(const struct device* dev) {
