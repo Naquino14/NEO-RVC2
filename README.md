@@ -11,7 +11,6 @@ Planned features:
 * 1-2 layer encryption (AES outside & possibly ADIS inside)
 * OBDII diagnostics
 * Remote start/stop
-* FUOTA
 * Warning speaker and a master caution/mute button panel
 
 Feature backburner:
