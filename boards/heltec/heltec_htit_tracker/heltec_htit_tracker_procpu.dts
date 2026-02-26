@@ -9,7 +9,7 @@
 #include "heltec_htit_tracker-pinctrl.dtsi"
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/dt-bindings/lora/sx126x.h>
-#include <espressif/partitions_0x0_amp.dtsi>
+#include <espressif/partitions_0x0_default_8M.dtsi>
 
 / {
 	model = "Heltec HTIT Tracker PROCPU";
@@ -85,14 +85,13 @@
 		zephyr,console = &usb_serial;
 		zephyr,shell-uart = &usb_serial;
 		zephyr,flash = &flash0;
-		zephyr,code-partition = &slot0_partition;
 		zephyr,bt-hci = &esp32_bt_hci;
 		zephyr,display = &st7735;
 	};
 };
 
 &flash0 {
-	reg = <0x0 DT_SIZE_M(4)>;
+	reg = <0x0 DT_SIZE_M(8)>;
 };
 
 &uart0 {
