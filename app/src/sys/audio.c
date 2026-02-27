@@ -131,7 +131,7 @@ static int open_parse_wav(const char* path, wav_file_t* out_wav) {
 K_MEM_SLAB_DEFINE_STATIC(i2s_tx_slab, I2S_TX_BLOCKSIZE, I2S_TX_BLOCKS, 2 * sizeof(uint16_t));
 static struct i2s_config i2s_cfg = {
     .format = I2S_FMT_DATA_FORMAT_I2S,
-    .options = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER,
+    .options = I2S_OPT_FRAME_CLK_CONTROLLER | I2S_OPT_BIT_CLK_CONTROLLER,
     .block_size = I2S_TX_BLOCKSIZE,
     .timeout = TX_QUEUE_FULL_TIMEOUT_MS,
     .mem_slab = &i2s_tx_slab
