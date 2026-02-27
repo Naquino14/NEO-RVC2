@@ -23,11 +23,11 @@ auto:
 	fi
 
 fob:
-	west build -b heltec_wifi_lora32_v3/esp32s3/procpu --sysbuild -s app -p auto -- \
+	west build -b heltec_wifi_lora32_v3/esp32s3/procpu -s app -p auto -- \
 		-DCONFIG_DEVICE_ROLE=1 -DBOARD_ROOT=$(CWD) -DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_wifi_lora32_v3_procpu.overlay
 
 trc:
-	west build -b heltec_htit_tracker/esp32s3/procpu --sysbuild -s app -p auto -- \
+	west build -b heltec_htit_tracker/esp32s3/procpu -s app -p auto -- \
 	-DCONFIG_DEVICE_ROLE=2 -DBOARD_ROOT=$(CWD) -DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_htit_tracker_procpu.overlay
 
 flash-fob:

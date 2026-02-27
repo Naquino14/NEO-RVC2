@@ -9,7 +9,7 @@
 #include "heltec_htit_tracker-pinctrl.dtsi"
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/dt-bindings/lora/sx126x.h>
-#include <espressif/partitions_0x0_amp.dtsi>
+#include <espressif/partitions_0x0_amp_8M.dtsi>
 
 / {
 	model = "Heltec HTIT Tracker PROCPU";
@@ -92,7 +92,7 @@
 };
 
 &flash0 {
-	reg = <0x0 DT_SIZE_M(4)>;
+	reg = <0x0 DT_SIZE_M(8)>;
 };
 
 &uart0 {
