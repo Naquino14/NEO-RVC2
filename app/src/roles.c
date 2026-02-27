@@ -272,9 +272,13 @@ static bool init_common()
     return rdy;
 }
 
+
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 static bool init_fob() {
     return true;
 }
+
+#elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 
 static bool init_trc_i2s() {
     if (role_devs->dev_i2s_stat == DEVSTAT_NOTINSTALLED) {
@@ -309,6 +313,8 @@ static bool init_trc() {
 
     return rdy;
 }
+
+#endif
 
 bool role_config()
 {
