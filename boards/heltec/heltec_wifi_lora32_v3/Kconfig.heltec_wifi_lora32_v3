@@ -1,9 +1,0 @@
-# HELTEC ESP32 board configuration
-
-# Copyright (c) 2025 Nate Aquino
-# SPDX-License-Identifier: Apache-2.0
-
-config BOARD_HELTEC_WIFI_LORA32_V3
-	select SOC_ESP32S3_FN8
-	select SOC_ESP32S3_PROCPU if BOARD_HELTEC_WIFI_LORA32_V3_ESP32_PROCPU
-	select SOC_ESP32S3_APPCPU if BOARD_HELTEC_WIFI_LORA32_V3_ESP32_APPCPU

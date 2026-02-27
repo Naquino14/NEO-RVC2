@@ -30,7 +30,7 @@ const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 
 #if CONFIG_EN_DEV_DISPLAY
-#define DISPLAY_NODE DT_NODELABEL(ssd1306)
+#define DISPLAY_NODE DT_CHOSEN(zephyr_display)
 const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
 #endif
 
@@ -93,7 +93,7 @@ role_devs_t* role_devs = &m_role_devs_fob;
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 
 #if CONFIG_EN_DEV_DISPLAY
-#define DISPLAY_NODE DT_NODELABEL(st7735)
+#define DISPLAY_NODE DT_CHOSEN(zephyr_display)
 const struct device * const display = DEVICE_DT_GET(DISPLAY_NODE);
 #define BLIGHT_NODE DT_ALIAS(blight)
 const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);

@@ -11,8 +11,8 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
 
-#include <lvgl.h>
-#include <lvgl_input_device.h>
+// #include <lvgl.h>
+// #include <lvgl_input_device.h>
 #include <math.h>
 
 #include "sys/storage.h"
@@ -318,8 +318,11 @@ static bool bit_display_ssd1306(bool wait_sw0) {
         return true;
     }
 
-    const int width = DT_PROP(DT_CHOSEN(zephyr_display), width);
-    const int height = DT_PROP(DT_CHOSEN(zephyr_display), height);
+    // query display for width and height
+    struct display_capabilities capabilities;
+    display_get_capabilities(role_devs->dev_display, &capabilities);
+    int width = capabilities.x_resolution;
+    int height = capabilities.y_resolution;
 
     const char PAT_A = 0b10101010, PAT_B = 0b1010101;
     
@@ -503,12 +506,12 @@ void run_bit() {
                 printk("Display OK\n");
 
                 // display role on screen
-                lv_obj_t *role_label = lv_label_create(lv_screen_active());
-                char role_label_str[11]; 
-                snprintf(role_label_str, sizeof(role_label_str), "Role: %s", role_get() == ROLE_FOB ? "FOB" : "TRC");
-                lv_label_set_text(role_label, role_label_str);
-                lv_obj_align(role_label, LV_ALIGN_CENTER, 0, 0);
-                lv_timer_handler(); // writes fb to screen?
+                // lv_obj_t *role_label = lv_label_create(lv_screen_active());
+                // char role_label_str[11]; 
+                // snprintf(role_label_str, sizeof(role_label_str), "Role: %s", role_get() == ROLE_FOB ? "FOB" : "TRC");
+                // lv_label_set_text(role_label, role_label_str);
+                // lv_obj_align(role_label, LV_ALIGN_CENTER, 0, 0);
+                // lv_timer_handler(); // writes fb to screen?
             } while (false);
 
     // static bool state = true;
