@@ -33,13 +33,13 @@ trc:
 	-DCONFIG_DEVICE_ROLE=2 -DBOARD_ROOT=$(CWD) -DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_htit_tracker_procpu.overlay
 
 flash-fob:
-	west flash --esp-device /dev/ttyUSB0
+	west flash --no-rebuild --esp-device /dev/ttyUSB0
 
 flash-trc:
-	west flash --esp-device /dev/ttyACM0
+	west flash --no-rebuild --esp-device /dev/ttyACM0
 
 flash: 	# automagic flash
-	west flash --esp-device $(BOARD_DEV)
+	west flash --no-rebuild --esp-device $(BOARD_DEV)
 
 mon-fob:
 	minicom -D /dev/ttyUSB0 -b $(BAUDRATE)
