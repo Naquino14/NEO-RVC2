@@ -3,6 +3,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/disk_access.h>
+#include <zephyr/drivers/display.h>
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
@@ -224,6 +225,14 @@ static bool init_common()
     } else {
         role_devs->dev_display_stat = DEVSTAT_RDY;
         LOG_INF("DISPLAY\t\tRDY");
+
+        // clear display
+        int ret = display_blanking_on(role_devs->dev_display);
+        if (ret < 0) {
+            LOG_ERR("Display blanking on failed: %d", ret);
+            role_devs->dev_display_stat = DEVSTAT_ERR;
+            rdy = false;
+        }
     }
 
     // CAN0

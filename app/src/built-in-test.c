@@ -358,9 +358,10 @@ static bool bit_display_ssd1306(bool wait_sw0) {
 
         display_blanking_off(role_devs->dev_display);
 
-        if (cnt >= 2)
+        if (cnt >= 2) {
+            display_blanking_on(role_devs->dev_display);
             break;
-        else if (!wait_sw0)
+        } else if (!wait_sw0)
             k_msleep(1000);
         else 
             k_sem_take(&sw0_sem, K_FOREVER);
