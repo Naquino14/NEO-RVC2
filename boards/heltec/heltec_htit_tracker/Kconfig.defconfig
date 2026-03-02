@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_HELTEC_HTIT_TRACKER_ESP32S3_PROCPU
+    if LVGL
+        CONFIG_LV_COLOR_16_SWAP=y
+    endif # lvgl
+endif # BOARD_HELTEC_HTIT_TRACKER_ESP32S3_PROCPU
