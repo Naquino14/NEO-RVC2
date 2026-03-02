@@ -83,6 +83,9 @@ static role_devs_t m_role_devs_fob = {
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
 
+    .dev_ufirebirdii = NULL,
+    .dev_ufirebirdii_stat = DEVSTAT_NOTINSTALLED,
+
 #if CONFIG_EN_DEV_SDHC
     .dev_sdcard_stat = DEVSTAT_NOT_RDY,
 #else
@@ -103,6 +106,11 @@ const struct gpio_dt_spec blight = GPIO_DT_SPEC_GET(BLIGHT_NODE, gpios);
 #if CONFIG_EN_DEV_I2S
 #define I2S_NODE DT_ALIAS(i2s_tx)
 const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
+#endif
+
+#if CONFIG_EN_DEV_UFIREBIRDII
+#define UFIREBIRDII_NODE DT_ALIAS(ufirebirdii)
+const struct device * const ufirebirdii = DEVICE_DT_GET(UFIREBIRDII_NODE);
 #endif
 
 static role_devs_t m_role_devs_trc = {
@@ -156,6 +164,14 @@ static role_devs_t m_role_devs_trc = {
 #else
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
+#endif
+
+#if CONFIG_EN_DEV_UFIREBIRDII
+    .dev_ufirebirdii = ufirebirdii,
+    .dev_ufirebirdii_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_ufirebirdii = NULL,
+    .dev_ufirebirdii_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
 #if CONFIG_EN_DEV_SDHC
@@ -307,6 +323,25 @@ static bool init_trc_i2s() {
     return true;
 }
 
+static bool init_trc_ufirebirdii() {
+    if (role_devs->dev_ufirebirdii_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("uFirebird II\tNOT INSTALLED");
+        return true;
+    }
+
+    int ret = device_is_ready(role_devs->dev_ufirebirdii);
+    if (ret < 0) {
+        LOG_ERR("UFirebird II device is not ready");
+        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_ufirebirdii_stat = DEVSTAT_RDY;
+    LOG_INF("UFirebird II\tRDY");
+    
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
@@ -319,6 +354,8 @@ static bool init_trc() {
         role_devs->gpio_blight_stat = DEVSTAT_RDY;
 
     rdy &= init_trc_i2s();
+
+    rdy &= init_trc_ufirebirdii();
 
     return rdy;
 }
