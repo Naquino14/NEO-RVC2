@@ -1,0 +1,1 @@
+add_subdirectory_ifdef(CONFIG_UC6580 uc6580)
