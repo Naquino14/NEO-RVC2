@@ -33,6 +33,14 @@
     status = "okay";
 };
 
+&uart1 {
+    ufbii_gnss: uc6580 {
+        compatible = "unicore,uc6580";
+        status = "okay";
+        pps-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+    };
+};
+
 &spi3 {
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
             <&gpio1 13 GPIO_ACTIVE_LOW>,    // CAN module GPIO 45 == GPIO1 13
