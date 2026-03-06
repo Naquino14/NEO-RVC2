@@ -23,7 +23,7 @@ typedef struct {
 #define UFBII_ADDR_I2C 0x46
 #define UFBII_ADDR_DEFAULT 0x00
 
-enum ufirebirdii_port_id_t {
+enum ufirebirdii_port_id {
     UFBII_PORT_ID_I2C   = 0x0,
     UFBII_PORT_ID_UART1 = 0x1,
     UFBII_PORT_ID_UART2 = 0x2,
@@ -90,7 +90,7 @@ enum ufirebirdii_msg_class {
     UFBII_MSG_ID_OBSERVATION_RF_ION = 4,
 };
 
-enum ufirebirdii_msg_class_t {
+enum ufirebirdii_msg_class {
     UFBII_MSG_CLASS_NMEA = 0,
     UFBII_MSG_CLASS_OBSERVATION = 2, // UM670A & UM680A & UM681A
     UFBII_MSG_CLASS_SENSOR_FUSION = 4, // UM621 & UM681A
