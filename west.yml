@@ -1,0 +1,52 @@
+# Copyright (c) 2021 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  group-filter:
+  - -babblesim
+  - -testing
+  - -optional
+  projects:
+  - name: zephyr
+    url: https://github.com/zephyrproject-rtos/zephyr
+    revision: 02191db6fe3aaa809a75743b4eb9561a08d32fc2
+    west-commands: scripts/west-commands.yml
+  - name: fatfs
+    url: https://github.com/zephyrproject-rtos/fatfs
+    revision: f4ead3bf4a6dab3a07d7b5f5315795c073db568d
+    path: modules/fs/fatfs
+    groups:
+    - fs
+  - name: hal_espressif
+    url: https://github.com/zephyrproject-rtos/hal_espressif
+    revision: 928f0184a9fd68e71c6fbd7e58b28dbbccd632aa
+    path: modules/hal/espressif
+    west-commands: west/west-commands.yml
+    groups:
+    - hal
+  - name: loramac-node
+    url: https://github.com/zephyrproject-rtos/loramac-node
+    revision: fb00b383072518c918e2258b0916c996f2d4eebe
+    path: modules/lib/loramac-node
+  - name: lvgl
+    url: https://github.com/zephyrproject-rtos/lvgl
+    revision: 94ae6c0535aa6ac4b08a75f4ae2c3a08cacb5c41
+    path: modules/lib/gui/lvgl
+  - name: mbedtls
+    url: https://github.com/zephyrproject-rtos/mbedtls
+    revision: c5b06d89c9c498d8fc8659ce31f7e53137b6270f
+    path: modules/crypto/mbedtls
+    groups:
+    - crypto
+  - name: mcuboot
+    url: https://github.com/zephyrproject-rtos/mcuboot
+    revision: d9c2ba153128efd7c16db9f36dea4ee69f63c7f5
+    path: bootloader/mcuboot
+    groups:
+    - bootloader
+  self:
+    path: NEO-RVC2.git

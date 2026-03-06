@@ -11,6 +11,8 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
 
+#include <drivers/ufirebirdii.h>
+
 // #include <lvgl.h>
 // #include <lvgl_input_device.h>
 #include <math.h>
@@ -309,6 +311,38 @@ static bool bit_i2s() {
     return true;
 }
 
+static bool bit_ufirebirdii() {
+    // get fix from uc6580
+    if (role_devs->dev_ufirebirdii_stat != DEVSTAT_RDY) {
+        LOG_WRN("uFirebird II\tSKIP");
+        return true;
+    }
+
+    int ret = ufirebirdii_start(role_devs->dev_ufirebirdii);
+    if (ret < 0) {
+        LOG_ERR("uFirebird II start failed: %d", ret);
+        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ufirebirdii_fix_t fix;
+    ret = ufirebirdii_get_fix(role_devs->dev_ufirebirdii, &fix);
+    if (ret < 0) {
+        LOG_ERR("uFirebird II get fix failed: %d", ret);
+        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ret = ufirebirdii_stop(role_devs->dev_ufirebirdii);
+    if (ret < 0) {
+        LOG_ERR("uFirebird II stop failed: %d", ret);
+        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    return true;
+}
+
 #endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
@@ -389,6 +423,9 @@ bool bit_role_specific_basic() {
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
     
     if (!bit_i2s())
+        ok = false;
+
+    if (!bit_ufirebirdii())
         ok = false;
 
 #endif
