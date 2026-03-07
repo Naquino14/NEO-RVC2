@@ -45,7 +45,7 @@ enum ufirebirdii_outpro  {
     UFBII_OUTPRO_ERTCM4074PVT   = 0x80,
 };
 
-enum ufirebirdii_msg_class {
+enum ufirebirdii_msg_id {
     UFBII_MSG_ID_NMEA_GGA = 0,
     UFBII_MSG_ID_NMEA_GLL = 1,
     UFBII_MSG_ID_NMEA_GSA = 2,
