@@ -10,15 +10,18 @@
 #include <stdbool.h>
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
+#include <time.h>
 
-typedef struct {
+struct ufirebirdii_fix {
     double latitude;
     double longitude;
     double altitude;
+    time_t timestamp;
     float hdop;
     uint8_t satellites;
     bool valid;
-} ufirebirdii_fix_t;
+
+};
 
 #define UFBII_ADDR_I2C 0x46
 #define UFBII_ADDR_DEFAULT 0x00
@@ -101,24 +104,24 @@ enum ufirebirdii_msg_class {
     UFBII_MSG_CLASS_OBSERVATION_RF = 9, // UC6580 & UM670A & UM680A
 };
 
-typedef struct {
+struct ufirebirdii_user_config {
     bool do_checksum;
     // TODO
-} ufirebirdii_user_config_t;
+};
 
-typedef struct {
+struct ufirebirdii_driver_config {
     uint32_t baud;
     uint8_t addr;
     enum ufirebirdii_inpro inpro;
     enum ufirebirdii_outpro outpro;
-    ufirebirdii_user_config_t user_config;
+    struct ufirebirdii_user_config user_config;
     // TODO
-} ufirebirdii_driver_config_t;
+};
 
 struct ufirebirdii_api {
     int (*start)(const struct device* dev);
     int (*stop)(const struct device* dev);
-    int (*get_fix)(const struct device* dev, ufirebirdii_fix_t* fix);
+    int (*get_fix)(const struct device* dev, struct ufirebirdii_fix* fix);
 };
 
 static inline int ufirebirdii_start(const struct device* dev) {
@@ -129,7 +132,7 @@ static inline int ufirebirdii_stop(const struct device* dev) {
     return ((const struct ufirebirdii_api*)dev->api)->stop(dev);
 }
 
-static inline int ufirebirdii_get_fix(const struct device* dev, ufirebirdii_fix_t* fix) {
+static inline int ufirebirdii_get_fix(const struct device* dev, struct ufirebirdii_fix* fix) {
     return ((const struct ufirebirdii_api*)dev->api)->get_fix(dev, fix);
 }
 

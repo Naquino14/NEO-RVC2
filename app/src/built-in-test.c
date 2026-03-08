@@ -325,7 +325,7 @@ static bool bit_ufirebirdii() {
         return false;
     }
 
-    ufirebirdii_fix_t fix;
+    struct ufirebirdii_fix fix;
     ret = ufirebirdii_get_fix(role_devs->dev_ufirebirdii, &fix);
     if (ret < 0) {
         LOG_ERR("uFirebird II get fix failed: %d", ret);

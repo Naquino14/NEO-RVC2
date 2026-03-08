@@ -8,11 +8,44 @@
 
 LOG_MODULE_REGISTER(uc6580);
 
+static void uc6580_uart_cb(const struct device* uart, void* user_data) {
+    const struct device* dev = user_data;
+    struct uc6580_data* data = dev->data;
+    uint8_t chr;
+    
+    if (!uart_irq_update(uart)) {
+        return;  // No logging in ISR
+    }
+
+    while (uart_irq_rx_ready(uart)) {
+        if (uart_fifo_read(uart, &chr, 1) == 1) {
+            ring_buf_put(&data->rx_ringbuf, &chr, 1);
+        }
+    }
+
+    k_work_submit(&data->rx_work);
+}
+
+#define UC6580_SENTENCE_BUF 256
+
+static void uc6580_rx_work_handler(struct k_work* work) {
+    struct uc6580_data* data = CONTAINER_OF(work, struct uc6580_data, rx_work);
+    uint8_t sentence_buf[UC6580_SENTENCE_BUF];
+    uint32_t len;
+
+    while ((len = ring_buf_get(&data->rx_ringbuf, sentence_buf, sizeof(sentence_buf) - 1)) > 0) {
+        sentence_buf[len] = '\0';
+        // LOG_INF("RXed (%d): %s", len, sentence_buf);
+    }
+}
+
 static int uc6580_init(const struct device* dev) {
-    LOG_ERR("EUREKA!");
+    LOG_INF("Initializing UC6580");
+
+    struct uc6580_data* data = dev->data;
+    const struct uc6580_config* cfg = dev->config;
 
     // check if uart is ready
-    const struct uc6580_config* cfg = dev->config;
     if (!device_is_ready(cfg->uart)) {
         LOG_ERR("UART device is not ready");
         return -ENODEV;
@@ -30,6 +63,16 @@ static int uc6580_init(const struct device* dev) {
         return ret;
     }
 
+    // init ring buffer to store incoming data from uc6580 uart
+    ring_buf_init(&data->rx_ringbuf, sizeof(data->rx_data), data->rx_data);
+
+    // init workqueue for processing sentences
+    k_work_init(&data->rx_work, uc6580_rx_work_handler); 
+    k_sem_init(&data->fix_sem, 1, 1);
+
+    uart_irq_callback_user_data_set(cfg->uart, uc6580_uart_cb, (void*)dev);
+    uart_irq_rx_enable(cfg->uart);
+
     return 0;
 }
 
@@ -43,8 +86,13 @@ static int uc6580_stop(const struct device* dev) {
     return 0;
 }
 
-static int uc6580_get_fix(const struct device* dev, ufirebirdii_fix_t* fix) {
-    LOG_INF("GET FIX!");
+static int uc6580_get_fix(const struct device* dev, struct ufirebirdii_fix* fix) {
+    const struct uc6580_data* data = dev->data;
+    if (!data->last_fix.valid) {
+        return -EAGAIN;
+    }
+    
+    *fix = data->last_fix;
     return 0;
 }
 
@@ -61,12 +109,13 @@ static struct ufirebirdii_api uc6580_api = {
 }                                                           \
 
 #define UC6580_DEFINE(inst)                                 \
+    static struct uc6580_data uc6580_data_##inst;           \
     static const struct uc6580_config uc6580_cfg_##inst =   \
         UC6580_CONFIG(inst);                                \
     DEVICE_DT_INST_DEFINE(inst,                             \
         uc6580_init,                                        \
         NULL,                                               \
-        NULL,                                               \
+        &uc6580_data_##inst,                                \
         &uc6580_cfg_##inst,                                 \
         POST_KERNEL,                                        \
         CONFIG_KERNEL_INIT_PRIORITY_DEVICE,                 \
