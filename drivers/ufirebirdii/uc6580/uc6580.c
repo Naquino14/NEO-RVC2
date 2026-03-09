@@ -2,26 +2,25 @@
 
 #include <errno.h>
 #include <zephyr/logging/log.h>
-#include <drivers/ufirebirdii.h>
+#include <drivers/ufirebirdii/ufirebirdii.h>
+#include <limits.h>
 
 #include "uc6580.h"
 
 LOG_MODULE_REGISTER(uc6580);
 
 static void uc6580_uart_cb(const struct device* uart, void* user_data) {
+    // Do not log here! I learned my lesson the hard way
     const struct device* dev = user_data;
     struct uc6580_data* data = dev->data;
     uint8_t chr;
     
-    if (!uart_irq_update(uart)) {
-        return;  // No logging in ISR
-    }
+    if (!uart_irq_update(uart)) 
+        return; 
 
-    while (uart_irq_rx_ready(uart)) {
-        if (uart_fifo_read(uart, &chr, 1) == 1) {
+    while (uart_irq_rx_ready(uart)) 
+        if (uart_fifo_read(uart, &chr, 1) == 1) 
             ring_buf_put(&data->rx_ringbuf, &chr, 1);
-        }
-    }
 
     k_work_submit(&data->rx_work);
 }
@@ -33,9 +32,34 @@ static void uc6580_rx_work_handler(struct k_work* work) {
     uint8_t sentence_buf[UC6580_SENTENCE_BUF];
     uint32_t len;
 
-    while ((len = ring_buf_get(&data->rx_ringbuf, sentence_buf, sizeof(sentence_buf) - 1)) > 0) {
-        sentence_buf[len] = '\0';
+    while ((len = ring_buf_peek(&data->rx_ringbuf, sentence_buf, sizeof(sentence_buf) - 1)) > 0) {
+        // Unicore devices send some junk like copyright info on startup
+        // ignore those by seeking the first dollar sign.
+        // This loop peeks the available ring buffer data, and matches $ with \r\n
+
+        uint32_t start_idx = UINT_MAX;
+        uint32_t end_idx = 0;
+
+        for (uint32_t i = 0; i < sizeof(sentence_buf) - 1; i++) {
+            if (sentence_buf[i] == '$')
+                start_idx = i;
+            if (sentence_buf[i] == '\n' && sentence_buf[i - 1] == '\r')
+                end_idx = i;
+        }
         // LOG_INF("RXed (%d): %s", len, sentence_buf);
+
+        if (start_idx != UINT_MAX && end_idx > start_idx) {
+            ring_buf_get(&data->rx_ringbuf, NULL, start_idx);
+            ring_buf_get(&data->rx_ringbuf, sentence_buf, end_idx - start_idx + 1); 
+            sentence_buf[end_idx - start_idx + 1] = '\0'; 
+            int ret = ufirebirdii_parse_sentence((char*)sentence_buf, &data->last_fix);
+            if (ret < 0) {
+                LOG_ERR("Failed to parse sentence: %d", ret);
+            }
+        } else {
+            // if we can't find a full sentence, just drop the data to avoid overflow
+            ring_buf_get(&data->rx_ringbuf, NULL, len);
+        }
     }
 }
 

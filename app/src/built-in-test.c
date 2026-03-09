@@ -11,7 +11,7 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
 
-#include <drivers/ufirebirdii.h>
+#include <drivers/ufirebirdii/ufirebirdii.h>
 
 // #include <lvgl.h>
 // #include <lvgl_input_device.h>

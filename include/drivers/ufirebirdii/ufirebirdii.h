@@ -136,4 +136,7 @@ static inline int ufirebirdii_get_fix(const struct device* dev, struct ufirebird
     return ((const struct ufirebirdii_api*)dev->api)->get_fix(dev, fix);
 }
 
+// ufirebirdii api
+int ufirebirdii_parse_sentence(const char* sentence, struct ufirebirdii_fix* fix);
+
 #endif // UFIREBIRDII_H
