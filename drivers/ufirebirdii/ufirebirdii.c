@@ -5,6 +5,6 @@
 LOG_MODULE_REGISTER(ufirebirdii);
 
 int ufirebirdii_parse_sentence(const char *sentence, struct ufirebirdii_fix *fix) {
-    LOG_DBG("Parsing sentence: %s", sentence);
+    // LOG_INF("Parsing sentence: %s", sentence);
     return 0;
 }

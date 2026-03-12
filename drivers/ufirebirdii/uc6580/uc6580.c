@@ -25,7 +25,7 @@ static void uc6580_uart_cb(const struct device* uart, void* user_data) {
     k_work_submit(&data->rx_work);
 }
 
-#define UC6580_SENTENCE_BUF 256
+#define UC6580_SENTENCE_BUF 82
 
 static void uc6580_rx_work_handler(struct k_work* work) {
     struct uc6580_data* data = CONTAINER_OF(work, struct uc6580_data, rx_work);
@@ -33,33 +33,32 @@ static void uc6580_rx_work_handler(struct k_work* work) {
     uint32_t len;
 
     while ((len = ring_buf_peek(&data->rx_ringbuf, sentence_buf, sizeof(sentence_buf) - 1)) > 0) {
-        // Unicore devices send some junk like copyright info on startup
-        // ignore those by seeking the first dollar sign.
-        // This loop peeks the available ring buffer data, and matches $ with \r\n
-
         uint32_t start_idx = UINT_MAX;
-        uint32_t end_idx = 0;
+        uint32_t end_idx = UINT_MAX;
 
-        for (uint32_t i = 0; i < sizeof(sentence_buf) - 1; i++) {
-            if (sentence_buf[i] == '$')
+        for (uint32_t i = 0; i < len; i++) {
+            if (sentence_buf[i] == '$' && start_idx == UINT_MAX)
                 start_idx = i;
-            if (sentence_buf[i] == '\n' && sentence_buf[i - 1] == '\r')
+            if (i > 0 && sentence_buf[i] == '\n' && sentence_buf[i - 1] == '\r') {
                 end_idx = i;
-        }
-        // LOG_INF("RXed (%d): %s", len, sentence_buf);
-
-        if (start_idx != UINT_MAX && end_idx > start_idx) {
-            ring_buf_get(&data->rx_ringbuf, NULL, start_idx);
-            ring_buf_get(&data->rx_ringbuf, sentence_buf, end_idx - start_idx + 1); 
-            sentence_buf[end_idx - start_idx + 1] = '\0'; 
-            int ret = ufirebirdii_parse_sentence((char*)sentence_buf, &data->last_fix);
-            if (ret < 0) {
-                LOG_ERR("Failed to parse sentence: %d", ret);
+                break;  // found complete sentence
             }
-        } else {
-            // if we can't find a full sentence, just drop the data to avoid overflow
-            ring_buf_get(&data->rx_ringbuf, NULL, len);
         }
+
+        if (start_idx != UINT_MAX && end_idx != UINT_MAX && end_idx > start_idx) {
+            // discard bytes before '$'
+            ring_buf_get(&data->rx_ringbuf, NULL, start_idx);
+            
+            // read the sentence (from '$' to '\n' inclusive)
+            uint32_t sentence_len = end_idx - start_idx + 1;
+            ring_buf_get(&data->rx_ringbuf, sentence_buf, sentence_len);
+            sentence_buf[sentence_len] = '\0';
+            
+            ufirebirdii_parse_sentence((char*)sentence_buf, &data->last_fix); // discard return code for now
+        } else if (end_idx != UINT_MAX && start_idx == UINT_MAX) 
+            ring_buf_get(&data->rx_ringbuf, NULL, end_idx + 1); // end but no start, discard
+        else 
+            break; // wait for more data
     }
 }
 
@@ -142,7 +141,7 @@ static struct ufirebirdii_api uc6580_api = {
         &uc6580_data_##inst,                                \
         &uc6580_cfg_##inst,                                 \
         POST_KERNEL,                                        \
-        CONFIG_KERNEL_INIT_PRIORITY_DEVICE,                 \
+        90,                                                 \
         &uc6580_api);
 
 DT_INST_FOREACH_STATUS_OKAY(UC6580_DEFINE)

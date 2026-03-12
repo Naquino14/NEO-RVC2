@@ -5,6 +5,8 @@ config UC6580
     bool "Unicore UC6580"
     select UART
     select RING_BUFFER
+    select SERIAL
+    select UART_INTERRUPT_DRIVEN
     help
         Enable support for the Unicore UC6580 GNSS receiver. 
 
