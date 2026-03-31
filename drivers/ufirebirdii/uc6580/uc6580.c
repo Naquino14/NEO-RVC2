@@ -25,7 +25,8 @@ static void uc6580_uart_cb(const struct device* uart, void* user_data) {
     k_work_submit(&data->rx_work);
 }
 
-#define UC6580_SENTENCE_BUF 82
+// #define UC6580_SENTENCE_BUF 82
+#define UC6580_SENTENCE_BUF 128
 
 static void uc6580_rx_work_handler(struct k_work* work) {
     struct uc6580_data* data = CONTAINER_OF(work, struct uc6580_data, rx_work);
@@ -54,7 +55,7 @@ static void uc6580_rx_work_handler(struct k_work* work) {
             ring_buf_get(&data->rx_ringbuf, sentence_buf, sentence_len);
             sentence_buf[sentence_len] = '\0';
             
-            ufirebirdii_parse_sentence((char*)sentence_buf, &data->last_fix); // discard return code for now
+            ufirebirdii_parse_sentence((char*)sentence_buf, sentence_len, &data->last_fix, &data->devconfig); // discard return code for now
         } else if (end_idx != UINT_MAX && start_idx == UINT_MAX) 
             ring_buf_get(&data->rx_ringbuf, NULL, end_idx + 1); // end but no start, discard
         else 
