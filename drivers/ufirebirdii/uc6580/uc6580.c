@@ -69,6 +69,12 @@ static int uc6580_init(const struct device* dev) {
     struct uc6580_data* data = dev->data;
     const struct uc6580_config* cfg = dev->config;
 
+    data->devconfig.baud = DT_PROP(DT_PARENT(DT_DRV_INST(0)), current_speed);
+    data->devconfig.addr = 0; // UART Mode only supported right now
+    data->devconfig.variant = UFBII_VARIANT_UC6580;
+    data->devconfig.inpro = 0; // TODO
+    data->devconfig.outpro = 0; // TODO
+
     // check if uart is ready
     if (!device_is_ready(cfg->uart)) {
         LOG_ERR("UART device is not ready");

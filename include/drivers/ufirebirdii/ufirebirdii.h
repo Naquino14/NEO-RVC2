@@ -12,19 +12,51 @@
 #include <zephyr/kernel.h>
 #include <time.h>
 
+enum ufbii_direction {
+    DIRECTION_NORTH = 'N',
+    DIRECTION_EAST = 'E',
+    DIRECTION_SOUTH = 'S',
+    DIRECTION_WEST = 'W',
+    DIRECTION_INVALID = 'I'
+};
+
+typedef struct {
+    int deg;
+    double min;
+    enum ufbii_direction dir;
+} coord_t;
+
+enum ufbii_fix_validity {
+    FIX_VALIDITY_INVALID = 0,
+    FIX_VALITIDY_SINGLE_POINT_POSITIONING = 1,
+    FIX_VALITIDY_DIFFERENTIAL_POSITIONING = 2,
+    FIX_VALITIDY_RTK_FIX_SOLUTION = 4,
+    FIX_VALITIDY_RTK_FLOAT_SOLUTION = 5,
+    FIX_VALITIDY_INS_POSITIONING = 6,
+};
+
 struct ufirebirdii_fix {
-    double latitude;
-    double longitude;
+    coord_t latitude;
+    coord_t longitude;
     double altitude;
     time_t timestamp;
-    float hdop;
+    double hdop;
     uint8_t satellites;
     bool valid;
-
+    enum ufbii_fix_validity validity;
 };
 
 #define UFBII_ADDR_I2C 0x46
 #define UFBII_ADDR_DEFAULT 0x00
+
+enum ufirebirdii_variant {
+    UFBII_VARIANT_UC6580,
+    UFBII_VARIANT_UM670A,
+    UFBII_VARIANT_UM680A,
+    UFBII_VARIANT_UM681A,
+    UFBII_VARIANT_UM621,
+    UFBII_VARIANT_UM621N
+};
 
 enum ufirebirdii_port_id {
     UFBII_PORT_ID_I2C   = 0x0,
@@ -112,6 +144,7 @@ struct ufirebirdii_user_config {
 struct ufirebirdii_driver_config {
     uint32_t baud;
     uint8_t addr;
+    enum ufirebirdii_variant variant;
     enum ufirebirdii_inpro inpro;
     enum ufirebirdii_outpro outpro;
     struct ufirebirdii_user_config user_config;
