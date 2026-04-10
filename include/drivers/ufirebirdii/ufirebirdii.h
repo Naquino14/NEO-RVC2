@@ -39,7 +39,6 @@ struct ufirebirdii_fix {
     coord_t latitude;
     coord_t longitude;
     double altitude;
-    time_t timestamp;
     double hdop;
     uint8_t satellites;
     bool valid;
