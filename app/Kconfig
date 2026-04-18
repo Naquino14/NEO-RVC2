@@ -53,10 +53,10 @@ menu "Installed Devices"
                 Enable if I2S Amplifier is installed.
 
         config EN_DEV_UFIREBIRDII
-            bool "uFirebird II GNSS Installed"
+            bool "UFirebirdII GNSS Installed"
             default y
             help
-                Enable if uFirebird II GNSS is installed.
+                Enable if UFirebirdII GNSS is installed.
     endif
 endmenu 
 

@@ -44,7 +44,7 @@ static const int fail(int sentence_idx, const char* content, uint32_t content_le
 }
 
 
-#define DEFAULT_FORMAT "%3d%lf,%c,%3d%lf,%c,%d,%d,%lf,%lf"
+#define DEFAULT_FORMAT "%2d%lf,%c,%3d%lf,%c,%d,%d,%lf,%lf"
 #define FORMAT_NUM_FIELDS 10
 #define GGA_PARSE_BUF_SZ 128
 
@@ -198,7 +198,7 @@ int ufirebirdii_init(const struct device* dev, struct ufirebirdii_driver_config*
 }
 
 int ufirebirdii_parse_sentence(const char *sentence, uint32_t sentence_len, struct ufirebirdii_fix *fix, struct ufirebirdii_driver_config* cfg) {
-    fix->valid = false;
+    // fix->valid = false;
 
     if (cfg->user_config.do_checksum) {
         if (sentence_len < 4 || sentence[sentence_len - 3] != '*')

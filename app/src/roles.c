@@ -325,19 +325,19 @@ static bool init_trc_i2s() {
 
 static bool init_trc_ufirebirdii() {
     if (role_devs->dev_ufirebirdii_stat == DEVSTAT_NOTINSTALLED) {
-        LOG_INF("uFirebird II\tNOT INSTALLED");
+        LOG_INF("UFirebirdII\tNOT INSTALLED");
         return true;
     }
 
     int ret = device_is_ready(role_devs->dev_ufirebirdii);
     if (ret < 0) {
-        LOG_ERR("UFirebird II device is not ready");
+        LOG_ERR("UFirebirdII device is not ready");
         role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
         return false;
     }
 
     role_devs->dev_ufirebirdii_stat = DEVSTAT_RDY;
-    LOG_INF("UFirebird II\tRDY");
+    LOG_INF("UFirebirdII\tRDY");
     
     return true;
 }

@@ -315,7 +315,7 @@ static bool bit_i2s() {
 static bool bit_ufirebirdii() {
     // get fix from uc6580
     if (role_devs->dev_ufirebirdii_stat != DEVSTAT_RDY) {
-        LOG_WRN("UFirebird II\tSKIP");
+        LOG_WRN("UFirebirdII\tSKIP");
         return true;
     }
 
@@ -328,12 +328,18 @@ static bool bit_ufirebirdii() {
     }
 
     if (!fix.valid) {
-        LOG_ERR("UFirebird II fix invalid");
+        LOG_WRN("UFirebirdII fix invalid, test seprately after first fix");
         // role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return true; // dont fail bc bad fix != broken device
+        return true;
     }
 
-    LOG_INF("UFirebird II\tOK\nLatitude: %d°%lf' %c\nLongitude: %d°%lf' %c\nAltitude: %lf M\nSatellites: %d\nHDOP: %lf\nFix Validity: %d", 
+    LOG_INF("UFirebirdII\tOK\r\n\t\t\t\t"
+            "Latitude: %d°%lf %c\r\n\t\t\t\t"
+            "Longitude: %d°%lf %c\r\n\t\t\t\t"
+            "Altitude: %lf M\r\n\t\t\t\t"
+            "Satellites: %d\r\n\t\t\t\t"
+            "HDOP: %lf\r\n\t\t\t\t"
+            "Fix Validity: %d", 
         fix.latitude.deg, fix.latitude.min, fix.latitude.dir,
         fix.longitude.deg, fix.longitude.min, fix.longitude.dir,
         fix.altitude,
@@ -436,8 +442,8 @@ bool bit_role_specific_basic() {
         ok = false;
 
     // dont do ufbii gnss as fix wont be ready on boot
-    // if (!bit_ufirebirdii())
-    //     ok = false;
+    if (!bit_ufirebirdii())
+        ok = false;
 
 #endif
     

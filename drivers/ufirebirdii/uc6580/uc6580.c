@@ -119,6 +119,7 @@ static int uc6580_stop(const struct device* dev) {
 static int uc6580_get_fix(const struct device* dev, struct ufirebirdii_fix* fix) {
     const struct uc6580_data* data = dev->data;
     if (!data->last_fix.valid) {
+        LOG_INF("BLAH");
         return -EAGAIN;
     }
     
