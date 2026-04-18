@@ -10,8 +10,9 @@
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
+#include <zephyr/shell/shell.h>
 
-#include <drivers/ufirebirdii.h>
+#include <drivers/ufirebirdii/ufirebirdii.h>
 
 // #include <lvgl.h>
 // #include <lvgl_input_device.h>
@@ -314,33 +315,42 @@ static bool bit_i2s() {
 static bool bit_ufirebirdii() {
     // get fix from uc6580
     if (role_devs->dev_ufirebirdii_stat != DEVSTAT_RDY) {
-        LOG_WRN("uFirebird II\tSKIP");
+        LOG_WRN("UFirebird II\tSKIP");
         return true;
     }
 
-    int ret = ufirebirdii_start(role_devs->dev_ufirebirdii);
-    if (ret < 0) {
-        LOG_ERR("uFirebird II start failed: %d", ret);
-        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return false;
+    struct ufirebirdii_fix fix;
+    int ret = ufirebirdii_get_fix(role_devs->dev_ufirebirdii, &fix);
+
+    if (ret == -EAGAIN) {
+        LOG_WRN("UFirebird II fix not ready");
+        return true;
+    } // at this time ufirebirdii_get_fix only errors with -EAGAIN
+
+    if (!fix.valid) {
+        LOG_ERR("UFirebird II fix invalid");
+        // role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
+        return true; // dont fail bc bad fix != broken device
     }
 
-    ufirebirdii_fix_t fix;
-    ret = ufirebirdii_get_fix(role_devs->dev_ufirebirdii, &fix);
-    if (ret < 0) {
-        LOG_ERR("uFirebird II get fix failed: %d", ret);
-        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return false;
-    }
-
-    ret = ufirebirdii_stop(role_devs->dev_ufirebirdii);
-    if (ret < 0) {
-        LOG_ERR("uFirebird II stop failed: %d", ret);
-        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return false;
-    }
+    LOG_INF("UFirebird II\tOK\nLatitude: %d°%lf' %c\nLongitude: %d°%lf' %c\nAltitude: %lf M\nSatellites: %d\nHDOP: %lf\nFix Validity: %d", 
+        fix.latitude.deg, fix.latitude.min, fix.latitude.dir,
+        fix.longitude.deg, fix.longitude.min, fix.longitude.dir,
+        fix.altitude,
+        fix.satellites,
+        fix.hdop,
+        fix.validity
+    );
 
     return true;
+}
+
+static int shell_bit_ufirebirdii(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell;
+    (void)argc;
+    (void)argv;
+
+    return bit_ufirebirdii() ? 0 : -1;
 }
 
 #endif
@@ -422,11 +432,9 @@ bool bit_role_specific_basic() {
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
     
-    if (!bit_i2s())
-        ok = false;
+    ok &= bit_i2s();
 
-    if (!bit_ufirebirdii())
-        ok = false;
+    ok &= bit_ufirebirdii();
 
 #endif
     
@@ -630,3 +638,16 @@ void stop_bit() {
     gpio_remove_callback(role_devs->gpio_sw0->port, &sw0_cb_data);
     k_sem_reset(&sw0_sem);
 }
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit, 
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
+
+#if defined(CONFIG_UFIREBIRDII) && DT_NODE_EXISTS(DT_ALIAS(ufirebirdii))
+    SHELL_CMD(ufirebirdii, NULL, "Run UFirebird II BIT", shell_bit_ufirebirdii),
+#endif // UFirebirdII
+
+#endif // TRC
+    SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(bit, &sub_bit, "Run built-in-test on specific components", NULL);

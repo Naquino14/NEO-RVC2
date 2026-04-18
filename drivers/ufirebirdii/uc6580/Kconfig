@@ -4,5 +4,15 @@
 config UC6580
     bool "Unicore UC6580"
     select UART
+    select RING_BUFFER
+    select SERIAL
+    select UART_INTERRUPT_DRIVEN
     help
         Enable support for the Unicore UC6580 GNSS receiver. 
+
+config UC6580_RINGBUFFER_SIZE
+    depends on UC6580
+    int "UC6580 UART Ring Buffer Size"
+    default 1024
+    help
+        Set the size of the ring buffer used for UART reception in the UC6580 driver.
