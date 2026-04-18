@@ -315,31 +315,25 @@ static bool bit_i2s() {
 static bool bit_ufirebirdii() {
     // get fix from uc6580
     if (role_devs->dev_ufirebirdii_stat != DEVSTAT_RDY) {
-        LOG_WRN("UFirebirdII\tSKIP");
+        LOG_WRN("UFirebird II\tSKIP");
         return true;
     }
 
     struct ufirebirdii_fix fix;
     int ret = ufirebirdii_get_fix(role_devs->dev_ufirebirdii, &fix);
-    if (ret < 0) {
-        LOG_ERR("UFirebird II get fix failed: %d", ret);
-        role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return false;
-    }
+
+    if (ret == -EAGAIN) {
+        LOG_WRN("UFirebird II fix not ready");
+        return true;
+    } // at this time ufirebirdii_get_fix only errors with -EAGAIN
 
     if (!fix.valid) {
-        LOG_WRN("UFirebirdII fix invalid, test seprately after first fix");
+        LOG_ERR("UFirebird II fix invalid");
         // role_devs->dev_ufirebirdii_stat = DEVSTAT_ERR;
-        return true;
+        return true; // dont fail bc bad fix != broken device
     }
 
-    LOG_INF("UFirebirdII\tOK\r\n\t\t\t\t"
-            "Latitude: %d°%lf %c\r\n\t\t\t\t"
-            "Longitude: %d°%lf %c\r\n\t\t\t\t"
-            "Altitude: %lf M\r\n\t\t\t\t"
-            "Satellites: %d\r\n\t\t\t\t"
-            "HDOP: %lf\r\n\t\t\t\t"
-            "Fix Validity: %d", 
+    LOG_INF("UFirebird II\tOK\nLatitude: %d°%lf' %c\nLongitude: %d°%lf' %c\nAltitude: %lf M\nSatellites: %d\nHDOP: %lf\nFix Validity: %d", 
         fix.latitude.deg, fix.latitude.min, fix.latitude.dir,
         fix.longitude.deg, fix.longitude.min, fix.longitude.dir,
         fix.altitude,
@@ -438,12 +432,9 @@ bool bit_role_specific_basic() {
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
     
-    if (!bit_i2s())
-        ok = false;
+    ok &= bit_i2s();
 
-    // dont do ufbii gnss as fix wont be ready on boot
-    if (!bit_ufirebirdii())
-        ok = false;
+    ok &= bit_ufirebirdii();
 
 #endif
     

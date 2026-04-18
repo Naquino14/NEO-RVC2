@@ -50,7 +50,6 @@ static const int fail(int sentence_idx, const char* content, uint32_t content_le
 
 static const int parse_gga(int sentence_idx, const char* content, uint32_t content_len, struct ufirebirdii_fix* fix, struct ufirebirdii_driver_config* cfg) {
     struct ufirebirdii_fix local_fix = {0};
-    fix->valid = false;
     
     const char* content_no_ts = memchr(content, ',', content_len);
     if (content_no_ts == NULL || (content_no_ts + 1) >= (content + content_len)) {
@@ -83,6 +82,9 @@ static const int parse_gga(int sentence_idx, const char* content, uint32_t conte
         // LOG_ERR("Failed to parse GGA sentence, expected %d fields but got %d", FORMAT_NUM_FIELDS, ret);
         return -EINVAL;
     }
+
+    if (!fix->valid)
+        LOG_INF("Got valid fix!");
 
     fix->altitude = local_fix.altitude;
     fix->hdop = local_fix.hdop;
