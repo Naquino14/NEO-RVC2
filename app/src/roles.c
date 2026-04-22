@@ -23,11 +23,6 @@ const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
 const struct device * const lora = DEVICE_DT_GET(LORA_NODE);
 #endif
 
-#if CONFIG_EN_DEV_CAN0
-#define CAN_NODE DT_CHOSEN(zephyr_canbus) /// TODO change chosen if second CAN is added
-const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
-#endif
-
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 
 #if CONFIG_EN_DEV_DISPLAY
@@ -72,13 +67,8 @@ static role_devs_t m_role_devs_fob = {
     .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
-#if CONFIG_EN_DEV_CAN0
-    .dev_can0 = can0,
-    .dev_can0_stat = DEVSTAT_NOT_RDY,
-#else
     .dev_can0 = NULL,
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
-#endif
 
     .dev_can1 = NULL,
     .dev_can1_stat = DEVSTAT_NOTINSTALLED,
@@ -114,6 +104,11 @@ const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
 #if CONFIG_EN_DEV_UFIREBIRDII
 #define UFIREBIRDII_NODE DT_ALIAS(ufirebirdii)
 const struct device * const ufirebirdii = DEVICE_DT_GET(UFIREBIRDII_NODE);
+#endif
+
+#if CONFIG_EN_DEV_CAN0
+#define CAN0_NODE DT_ALIAS(can0) 
+const struct device * const can0 = DEVICE_DT_GET(CAN0_NODE);
 #endif
 
 #if CONFIG_EN_DEV_CAN1
@@ -267,18 +262,6 @@ static bool init_common()
         }
     }
 
-    // CAN0
-    if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED)
-        LOG_INF("CAN0\t\tNOT INSTALLED");
-    else if (!device_is_ready(role_devs->dev_can0)) {
-        LOG_ERR("CAN device is not ready");
-        role_devs->dev_can0_stat = DEVSTAT_ERR;
-        rdy = false;
-    } else {
-        role_devs->dev_can0_stat = DEVSTAT_RDY;
-        LOG_INF("CAN\t\tRDY");
-    }
-
     // SDHC
     if (role_devs->dev_sdcard_stat == DEVSTAT_NOTINSTALLED) 
         LOG_INF("SDHC\t\tNOT INSTALLED");
@@ -358,6 +341,24 @@ static bool init_trc_ufirebirdii() {
     return true;
 }
 
+static bool init_trc_can0() {
+    if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("CAN0\t\tNOT INSTALLED");
+        return true;
+    }
+    
+    int ret = device_is_ready(role_devs->dev_can0);
+    if (ret < 0) {
+        LOG_ERR("CAN device is not ready");
+        role_devs->dev_can0_stat = DEVSTAT_ERR;
+        return false;
+    }
+    role_devs->dev_can0_stat = DEVSTAT_RDY;
+    LOG_INF("CAN0\t\tRDY");
+
+    return true;
+}
+
 static bool init_trc_can1() {
     if (role_devs->dev_can1_stat == DEVSTAT_NOTINSTALLED) {
         LOG_INF("CAN1\t\tNOT INSTALLED");
@@ -391,6 +392,8 @@ static bool init_trc() {
     rdy &= init_trc_i2s();
 
     rdy &= init_trc_ufirebirdii();
+
+    rdy &= init_trc_can0();
 
     rdy &= init_trc_can1();
 

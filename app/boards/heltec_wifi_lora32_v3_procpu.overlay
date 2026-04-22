@@ -1,10 +1,8 @@
 / {
     aliases {
-        can0 = &can_over_spi;
     };
 
     chosen {
-        zephyr,canbus = &can_over_spi;
     };
 };
 
@@ -27,8 +25,7 @@
     status = "okay";
     pinctrl-0 = <&spim2_default>;
     pinctrl-names = "default";
-    cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>, // SD card GPIO 42 == GPIO1 10
-        <&gpio1 13 GPIO_ACTIVE_LOW>; // CAN module GPIO 45 == GPIO1 13
+    cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; // SD card GPIO 42 == GPIO1 10
 
     sdhc_card: sdhc@0 {
         compatible = "zephyr,sdhc-spi-slot";
@@ -40,13 +37,5 @@
             status = "okay";
         };
         spi-max-frequency = <DT_FREQ_M(18)>;
-    };
-
-    can_over_spi0: can0@1 {
-        compatible = "microchip,mcp2515";
-        reg = <1>;
-        osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>; 
-        spi-max-frequency = <DT_FREQ_M(4)>; // might be wrong, just a guess
     };
 };
