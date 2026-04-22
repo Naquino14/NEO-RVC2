@@ -57,6 +57,12 @@ menu "Installed Devices"
             default y
             help
                 Enable if UFirebirdII GNSS is installed.
+
+        config EN_DEV_CAN1
+            bool "CAN XCVR Installed"
+            default y
+            help
+                Enable if CAN transceiver 1 is installed
     endif
 endmenu 
 

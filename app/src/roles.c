@@ -80,6 +80,9 @@ static role_devs_t m_role_devs_fob = {
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
 #endif
 
+    .dev_can1 = NULL,
+    .dev_can1_stat = DEVSTAT_NOTINSTALLED,
+
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
 
@@ -111,6 +114,11 @@ const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
 #if CONFIG_EN_DEV_UFIREBIRDII
 #define UFIREBIRDII_NODE DT_ALIAS(ufirebirdii)
 const struct device * const ufirebirdii = DEVICE_DT_GET(UFIREBIRDII_NODE);
+#endif
+
+#if CONFIG_EN_DEV_CAN1
+#define CAN1_NODE DT_ALIAS(can1)
+const struct device * const can1 = DEVICE_DT_GET(CAN1_NODE);
 #endif
 
 static role_devs_t m_role_devs_trc = {
@@ -153,6 +161,14 @@ static role_devs_t m_role_devs_trc = {
 #if CONFIG_EN_DEV_CAN0
     .dev_can0 = can0,
     .dev_can0_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_can0 = NULL,
+    .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
+#endif
+
+#if CONFIG_EN_DEV_CAN1
+    .dev_can1 = can1,
+    .dev_can1_stat = DEVSTAT_NOT_RDY,
 #else
     .dev_can0 = NULL,
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
@@ -342,6 +358,25 @@ static bool init_trc_ufirebirdii() {
     return true;
 }
 
+static bool init_trc_can1() {
+    if (role_devs->dev_can1_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("CAN1\t\tNOT INSTALLED");
+        return true;
+    }
+
+    int ret = device_is_ready(role_devs->dev_can1);
+    if (ret < 0) {
+        LOG_ERR("CAN1 device is not ready");
+        role_devs->dev_can1_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_can1_stat = DEVSTAT_RDY;
+    LOG_INF("CAN1\t\tRDY");
+    
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
@@ -356,6 +391,8 @@ static bool init_trc() {
     rdy &= init_trc_i2s();
 
     rdy &= init_trc_ufirebirdii();
+
+    rdy &= init_trc_can1();
 
     return rdy;
 }

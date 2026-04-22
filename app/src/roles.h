@@ -20,13 +20,6 @@ extern const char* TRC_STR;
 #define ROLE_IS_FOB (role_get() == ROLE_FOB)
 #define ROLE_IS_TRC (role_get() == ROLE_TRC)
 
-#define I2S_SAMPLES_PER_BLOCK 64
-#define I2S_CHANNELS 2
-#define I2S_WORD_SIZE_BYTES sizeof(int16_t)
-#define I2S_SAMPLE_RATE_HZ 44100
-#define I2S_NUM_BLOCKS 8
-#define I2S_BLOCK_SIZE (I2S_CHANNELS * I2S_SAMPLES_PER_BLOCK * I2S_WORD_SIZE_BYTES)
-
 typedef enum {
    DEVSTAT_NOTINSTALLED = 0,
    DEVSTAT_NOT_RDY,
@@ -51,6 +44,9 @@ typedef struct  {
 
    const struct device *dev_can0;
    devstat_t dev_can0_stat;
+
+   const struct device *dev_can1;
+   devstat_t dev_can1_stat;
 
    const struct device *dev_i2s;
    devstat_t dev_i2s_stat;
@@ -105,7 +101,5 @@ inline const char* role_tostring() {
  * Automatically get device role and configure GPIOs
  */
 bool role_config();
-
-bool device_config();
 
 #endif // ROLES_H
