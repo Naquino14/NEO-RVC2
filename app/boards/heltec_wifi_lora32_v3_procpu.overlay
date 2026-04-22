@@ -42,11 +42,11 @@
         spi-max-frequency = <DT_FREQ_M(18)>;
     };
 
-    can_over_spi: can@1 {
+    can_over_spi0: can0@1 {
         compatible = "microchip,mcp2515";
         reg = <1>;
         osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>; // GPIO 38 == GPIO1 6
+        int-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>; 
         spi-max-frequency = <DT_FREQ_M(4)>; // might be wrong, just a guess
     };
 };

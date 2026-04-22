@@ -1,13 +1,14 @@
 / {
     aliases {
-        can0 = &can_over_spi;
+        can0 = &can_over_spi0;
+        can1 = &can_over_spi1;
         sdhc0 = &sdhc_card;
         i2s-tx = &i2s0;
         ufirebirdii = &ufbii_gnss;
     };
 
     chosen {
-        zephyr,canbus = &can_over_spi;
+        zephyr,canbus = &can_over_spi0;
     };
 };
 
@@ -44,21 +45,31 @@
 
 &spi3 {
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
-            <&gpio1 13 GPIO_ACTIVE_LOW>,    // CAN module GPIO 45 == GPIO1 13
-            <&gpio1 14 GPIO_ACTIVE_LOW>;    // SD card GPIO 46 == GPIO1 14 
+            <&gpio0 17 GPIO_ACTIVE_LOW>,    // CAN module 0
+            <&gpio0 26 GPIO_ACTIVE_LOW>,    // CAN module 1
+            <&gpio0 15 GPIO_ACTIVE_LOW>;    // SD card 
 
-    can_over_spi: can@1 {
+    can_over_spi0: can@1 {
         compatible = "microchip,mcp2515";
         reg = <1>;
         status = "okay";
         osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+        int-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
     }; 
 
-    sdhc_card: sdhc@2 {
-        compatible = "zephyr,sdhc-spi-slot";
+    can_over_spi1: can1@2 {
+        compatible = "microchip,mcp2515";
         reg = <2>;
+        status = "okay";
+        osc-freq = <DT_FREQ_M(8)>;
+        int-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+        spi-max-frequency = <DT_FREQ_M(10)>;
+    };
+
+    sdhc_card: sdhc@3 {
+        compatible = "zephyr,sdhc-spi-slot";
+        reg = <3>;
         status = "okay";
         mmc {
             compatible = "zephyr,sdmmc-disk";
