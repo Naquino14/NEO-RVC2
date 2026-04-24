@@ -9,4 +9,5 @@ target_sources(app PRIVATE
     src/roles.c
     src/sys/storage.c
     src/sys/audio.c
+    src/sys/can.c
 )

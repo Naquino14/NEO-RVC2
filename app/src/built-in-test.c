@@ -300,7 +300,7 @@ static bool bit_i2s() {
         return false;
     
 
-    ret = audio_play_file_blocking(NRVC2_STORAGE_MP"/master-caution.wav", K_MSEC(250));
+    ret = audio_play_file_blocking(NRVC2_STORAGE_MP"/bit.wav", K_MSEC(250));
     if (ret < 0) {
         LOG_ERR("I2S\t\tFAIL (%d)", ret);
         return false;
