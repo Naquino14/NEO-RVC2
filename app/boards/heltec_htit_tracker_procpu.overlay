@@ -58,7 +58,7 @@
         spi-max-frequency = <DT_FREQ_M(10)>;
     }; 
 
-    can_over_spi1: can1@2 {
+    can_over_spi1: can@2 {
         compatible = "microchip,mcp2515";
         reg = <2>;
         status = "okay";
