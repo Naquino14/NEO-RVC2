@@ -59,7 +59,7 @@ menu "Installed Devices"
                 Ex: CAN0 -> CAN-OBD; CAN1 -> CAN-ECU or something....
 
         config EN_DEV_CAN1
-            bool "CAN XCVR Installed"
+            bool "CAN XCVR 1 Installed"
             default y
             help
                 Enable if CAN transceiver 1 is installed
