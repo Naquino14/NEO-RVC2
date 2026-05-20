@@ -5,6 +5,8 @@
 #include <zephyr/storage/disk_access.h>
 #include <zephyr/drivers/display.h>
 
+#include "sys/can.h"
+
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
 
@@ -393,9 +395,15 @@ static bool init_trc() {
 
     rdy &= init_trc_ufirebirdii();
 
-    rdy &= init_trc_can0();
-
-    rdy &= init_trc_can1();
+    if (init_trc_can0() && init_trc_can1()) {
+        int ret = can_init();
+        if (ret < 0) {
+            LOG_ERR("CAN init failed with error %d", ret);
+            role_devs->dev_can0_stat = DEVSTAT_ERR;
+            role_devs->dev_can1_stat = DEVSTAT_ERR;
+            rdy = false;
+        }
+    }
 
     return rdy;
 }

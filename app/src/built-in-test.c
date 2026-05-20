@@ -10,6 +10,7 @@
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/fs/fs.h>
+#include <zephyr/drivers/can.h>
 #include <zephyr/shell/shell.h>
 
 #include <drivers/ufirebirdii/ufirebirdii.h>
@@ -20,6 +21,7 @@
 
 #include "sys/storage.h"
 #include "sys/audio.h"
+#include "sys/can.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -353,6 +355,96 @@ static int shell_bit_ufirebirdii(const struct shell *shell, size_t argc, char **
     return bit_ufirebirdii() ? 0 : -1;
 }
 
+enum can_bit_mode {
+    CAN_BIT_MODE_BASIC, // just check state of can devs
+    CAN_BIT_MODE_CONNECTED, // send frame to and from can0 <-> can1 if they are connected for testing
+    CAN_BIT_MODE_TALKER, // WIP. Send a frame out of can0 and can1, and check their state
+};
+
+static bool can_tx_ok_flag = false;
+void bit_can_tx_cb(const struct device *dev, int error, void *user_data) {
+    char* sender = (char*)user_data;
+    if (error < 0) {
+        LOG_ERR("CAN TX on sender %s failed: %d", sender, error);
+        can_tx_ok_flag = false;
+        return;
+    }
+    LOG_INF("CAN TX on sender %s succeeded", sender);
+    can_tx_ok_flag = true;
+}
+
+static bool bit_can(enum can_bit_mode mode) {
+    // TODO: separate into individual tests. for now i dont care
+    if (role_devs->dev_can0_stat != DEVSTAT_RDY || role_devs->dev_can1_stat != DEVSTAT_RDY) {
+        LOG_WRN("CAN0\t\tSKIP");
+        LOG_WRN("CAN1\t\tSKIP");
+        return true;
+    }
+    
+    switch (mode) {
+        case CAN_BIT_MODE_BASIC: 
+            LOG_INF("CAN0 state: %d", get_can_state(role_devs->dev_can0));
+            LOG_INF("CAN1 state: %d", get_can_state(role_devs->dev_can1));
+            break;
+        case CAN_BIT_MODE_CONNECTED: 
+            // send frame from can0 to can1, then can1 to can0, check if received correctly
+            const struct can_frame test_frame = {
+                .id = 0x1234,
+                .dlc = 10,
+                .data = { 'C', 'A', 'N', '0', 'C', 'A', 'N', '1' }
+            };
+
+            int ret = can_send(role_devs->dev_can0, &test_frame, K_MSEC(100), bit_can_tx_cb, (void*)"CAN0");
+            if (ret < 0) {
+                LOG_ERR("CAN send failed on CAN0: %d", ret);
+                role_devs->dev_can0_stat = DEVSTAT_ERR;
+                return false;
+            }
+
+            k_msleep(50); // wait for frame to be rxed
+
+            if (!can_tx_ok_flag) {
+                LOG_ERR("CAN frame was not transmitted successfully from CAN0");
+                role_devs->dev_can0_stat = DEVSTAT_ERR;
+                return false;
+            }
+
+            break;
+        case CAN_BIT_MODE_TALKER: 
+            // TODO: will do this eventually,. I just want basic functionality rn
+            break;
+        default:
+            LOG_ERR("Invalid CAN BIT mode");
+            return false;
+    }
+
+    return false;
+}
+
+static int shell_bit_can_basic(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell;
+    (void)argc;
+    (void)argv;
+
+    return bit_can(CAN_BIT_MODE_BASIC) ? 0 : -1;
+}
+
+static int shell_bit_can_connected(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell;
+    (void)argc;
+    (void)argv;
+
+    return bit_can(CAN_BIT_MODE_CONNECTED) ? 0 : -1;
+}
+
+static int shell_bit_can_talker(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell;
+    (void)argc;
+    (void)argv;
+
+    return bit_can(CAN_BIT_MODE_TALKER) ? 0 : -1;
+}
+
 #endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
@@ -435,6 +527,9 @@ bool bit_role_specific_basic() {
     ok &= bit_i2s();
 
     ok &= bit_ufirebirdii();
+
+    // code crashes before this point
+    ok &= bit_can(CAN_BIT_MODE_CONNECTED); // TODO: Changeme
 
 #endif
     
@@ -639,12 +734,26 @@ void stop_bit() {
     k_sem_reset(&sw0_sem);
 }
 
+// TODO: make it so that sub options are enabled-device aware. For now, just assume both CAN devs must be enabled
+#if defined(CONFIG_CAN) && defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit_can,
+    SHELL_CMD(basic, NULL, "Run basic CAN BIT (check device state)", shell_bit_can_basic),
+    SHELL_CMD(connected, NULL, "Run connected CAN BIT (test CAN0 <-> CAN1 communication if connected)", shell_bit_can_connected),
+    SHELL_CMD(talker, NULL, "Run CAN talker BIT (send frames on CAN0 and CAN1, check their state)", shell_bit_can_talker)
+);
+#endif // CAN BUT Submenu
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit, 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
 
 #if defined(CONFIG_UFIREBIRDII) && DT_NODE_EXISTS(DT_ALIAS(ufirebirdii))
     SHELL_CMD(ufirebirdii, NULL, "Run UFirebird II BIT", shell_bit_ufirebirdii),
 #endif // UFirebirdII
+
+#if defined(CONFIG_CAN)
+    // can bit submenu
+    SHELL_CMD(can, &sub_bit_can, "Run CAN BIT on specific modes", NULL),
+#endif // CAN and can dev enabled
 
 #endif // TRC
     SHELL_SUBCMD_SET_END
