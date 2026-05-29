@@ -1,13 +1,16 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.0 Chrome/140.0.7339.249 Electron/38.7.2 Safari/537.36" version="29.3.0">
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
   <diagram name="Page-1" id="q7LAFm-vrm_4aootUNU9">
-    <mxGraphModel dx="1921" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+    <mxGraphModel dx="1215" dy="722" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="xRkERdARgY-JmljRQ54O-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#76608a;fontColor=#ffffff;strokeColor=#FFFFFF;" value="" vertex="1">
+          <mxGeometry height="30" width="360" x="680" y="270" as="geometry" />
+        </mxCell>
         <mxCell id="N6Z7ze4LM2q5PKDHpfgC-36" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=light-dark(#FFFFFF,#FF8000);" value="&amp;nbsp;" vertex="1">
           <mxGeometry height="90" width="360" x="680" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="-XUhepm5SvSHhMMePffH-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#76608a;fontColor=#ffffff;strokeColor=#FFFFFF;" value="" vertex="1">
+        <mxCell id="-XUhepm5SvSHhMMePffH-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#4D9900;fontColor=#ffffff;strokeColor=#FFFFFF;" value="" vertex="1">
           <mxGeometry height="30" width="360" x="680" y="613" as="geometry" />
         </mxCell>
         <mxCell id="pqzipibnSZG6I8mXk4QF-13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=light-dark(#FFFFFF, #000000);" value="" vertex="1">
@@ -139,7 +142,7 @@
         <mxCell id="N6Z7ze4LM2q5PKDHpfgC-43" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
           <mxGeometry height="170" width="350" x="15" y="20" as="geometry" />
         </mxCell>
-        <mxCell id="N6Z7ze4LM2q5PKDHpfgC-45" parent="1" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;&lt;font style=&quot;font-size: 32px;&quot;&gt;NEO-RVC2&lt;/font&gt;&lt;/h1&gt;&lt;p&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;New-Remote Vehicle Command and Control&amp;nbsp;&lt;/font&gt;&lt;/p&gt;&lt;p&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;TRC: Tracker Controller pinout&lt;br&gt;&lt;/font&gt;&lt;span style=&quot;font-size: 16px; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Heltec HTIT Tracker&lt;br&gt;4/21/26&lt;/span&gt;&lt;/p&gt;" vertex="1">
+        <mxCell id="N6Z7ze4LM2q5PKDHpfgC-45" parent="1" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;&lt;font style=&quot;font-size: 32px;&quot;&gt;NEO-RVC2&lt;/font&gt;&lt;/h1&gt;&lt;p&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;New-Remote Vehicle Command and Control&amp;nbsp;&lt;/font&gt;&lt;/p&gt;&lt;p&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;TRC: Tracker Controller pinout&lt;br&gt;&lt;/font&gt;&lt;span style=&quot;font-size: 16px; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Heltec HTIT Tracker&lt;br&gt;5/29/26&lt;/span&gt;&lt;/p&gt;" vertex="1">
           <mxGeometry height="150" width="334" x="31" y="30" as="geometry" />
         </mxCell>
         <mxCell id="V0UaXwdz1ZXF3kd9HauZ-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;left&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;5: I2S SD -&amp;gt;&lt;/font&gt;&lt;/div&gt;" vertex="1">
@@ -157,7 +160,7 @@
         <mxCell id="IdBY2wkEldM3QO9nnRyA-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;left&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;16: CAN0 INT&lt;/font&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="30" width="148" x="702" y="129" as="geometry" />
         </mxCell>
-        <mxCell id="IdBY2wkEldM3QO9nnRyA-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;left&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;&amp;nbsp;8: CAN1 INT&lt;/font&gt;&lt;/div&gt;" vertex="1">
+        <mxCell id="IdBY2wkEldM3QO9nnRyA-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;left&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;&amp;nbsp;8: LORA CS&lt;/font&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="30" width="305" x="705" y="613" as="geometry" />
         </mxCell>
         <mxCell id="OekazXlghri0ykoRWBLs-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;right&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;&lt;span style=&quot;text-align: -webkit-left; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;CAN1 SPI3 CS&lt;/span&gt;&amp;nbsp;:26&lt;/font&gt;&lt;/div&gt;" vertex="1">
@@ -222,6 +225,9 @@
         </mxCell>
         <mxCell id="pqzipibnSZG6I8mXk4QF-15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=light-dark(#FFFFFF,#FF3333);" value="" vertex="1">
           <mxGeometry height="29" width="40" x="80" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="xRkERdARgY-JmljRQ54O-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto%2BMono;" value="&lt;div align=&quot;left&quot;&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;&amp;nbsp;4: CAN1 INT&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="305" x="701" y="271" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
