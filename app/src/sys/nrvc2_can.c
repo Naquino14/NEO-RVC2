@@ -1,4 +1,4 @@
-#include "can.h"
+#include "nrvc2_can.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>

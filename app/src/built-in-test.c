@@ -21,7 +21,7 @@
 
 #include "sys/storage.h"
 #include "sys/audio.h"
-#include "sys/can.h"
+#include "sys/nrvc2_can.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 

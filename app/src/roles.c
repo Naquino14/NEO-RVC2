@@ -5,7 +5,7 @@
 #include <zephyr/storage/disk_access.h>
 #include <zephyr/drivers/display.h>
 
-#include "sys/can.h"
+#include "sys/nrvc2_can.h"
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
