@@ -335,7 +335,7 @@ static bool bit_ufirebirdii() {
         return true; // dont fail bc bad fix != broken device
     }
 
-    LOG_INF("UFirebird II\tOK\nLatitude: %d°%lf' %c\nLongitude: %d°%lf' %c\nAltitude: %lf M\nSatellites: %d\nHDOP: %lf\nFix Validity: %d", 
+    LOG_INF("UFirebird II\tOK\r\nLatitude: %d°%lf' %c\r\nLongitude: %d°%lf' %c\r\nAltitude: %lf M\r\nSatellites: %d\r\nHDOP: %lf\r\nFix Validity: %d", 
         fix.latitude.deg, fix.latitude.min, fix.latitude.dir,
         fix.longitude.deg, fix.longitude.min, fix.longitude.dir,
         fix.altitude,
