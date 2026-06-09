@@ -4,7 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/can.h>
 
-int can_init();
+int can_init(const struct device* dev, const char* devname);
 
 enum can_state get_can_state(const struct device* dev);
 

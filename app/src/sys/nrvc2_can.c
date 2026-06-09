@@ -7,6 +7,9 @@
 #include "../roles.h"
 #include "../nrvc2_errno.h"
 
+#define CAN_BITRATE_KBPS 500
+#define CAN_SAMPLE_POINT_PERMILLE 875
+
 LOG_MODULE_REGISTER(can);
 
 static char* state_tostr(enum can_state state) {
@@ -26,10 +29,6 @@ static char* state_tostr(enum can_state state) {
     }
 }
 
-int can_init() {
-    return 0; 
-}
-
 enum can_state get_can_state(const struct device* dev) {
     enum can_state state;
     struct can_bus_err_cnt err_cnt;
@@ -39,4 +38,36 @@ enum can_state get_can_state(const struct device* dev) {
         return CAN_STATE_STOPPED;
     }
     return state;
+}
+
+int can_init(const struct device* dev, const char* devname) {
+    struct can_timing timing;
+    int ret = can_calc_timing(dev, 
+                            &timing, CAN_BITRATE_KBPS * 1000, 
+                            CAN_SAMPLE_POINT_PERMILLE);
+    if (ret > 0)
+        LOG_WRN("Sample point error for %s: %d", devname, ret);
+    else if (ret < 0) {
+        LOG_ERR("Unable to compute CAN timing for %s: %d", devname, ret);
+        return ret;
+    }
+
+    ret = can_stop(dev);
+    if (ret < 0 && ret != -EALREADY) {
+        LOG_ERR("Failed to stop %s device: %d", devname, ret);
+        return ret;
+    }
+
+    ret = can_set_timing(dev, &timing);
+    if (ret < 0) {
+        LOG_ERR("Failed to set %s timing: %d", devname, ret);
+        return ret;
+    }
+
+    ret = can_start(dev);
+    if (ret < 0) {
+        LOG_ERR("Failed to start %s device: %d", devname, ret);
+        return ret;
+    }
+    return 0; 
 }

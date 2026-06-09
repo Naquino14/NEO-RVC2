@@ -355,6 +355,13 @@ static bool init_trc_can0() {
         role_devs->dev_can0_stat = DEVSTAT_ERR;
         return false;
     }
+
+    ret = can_init(role_devs->dev_can0, "CAN0");
+    if (ret < 0) {
+        role_devs->dev_can0_stat = DEVSTAT_ERR;        
+        return false;
+    }
+
     role_devs->dev_can0_stat = DEVSTAT_RDY;
     LOG_INF("CAN0\t\tRDY");
 
@@ -371,6 +378,12 @@ static bool init_trc_can1() {
     if (ret < 0) {
         LOG_ERR("CAN1 device is not ready");
         role_devs->dev_can1_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ret = can_init(role_devs->dev_can1, "CAN1");
+    if (ret < 0) {
+        role_devs->dev_can1_stat = DEVSTAT_ERR;        
         return false;
     }
 
@@ -395,15 +408,8 @@ static bool init_trc() {
 
     rdy &= init_trc_ufirebirdii();
 
-    if (init_trc_can0() && init_trc_can1()) {
-        int ret = can_init();
-        if (ret < 0) {
-            LOG_ERR("CAN init failed with error %d", ret);
-            role_devs->dev_can0_stat = DEVSTAT_ERR;
-            role_devs->dev_can1_stat = DEVSTAT_ERR;
-            rdy = false;
-        }
-    }
+    rdy &= init_trc_can0();
+    rdy &= init_trc_can1();
 
     return rdy;
 }
