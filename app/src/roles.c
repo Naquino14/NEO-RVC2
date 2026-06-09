@@ -4,6 +4,7 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/disk_access.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/shell/shell.h>
 
 #include "sys/nrvc2_can.h"
 
