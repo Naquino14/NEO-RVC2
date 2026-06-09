@@ -63,7 +63,7 @@
         reg = <2>;
         status = "okay";
         osc-freq = <DT_FREQ_M(8)>;
-        int-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+        int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
     };
 

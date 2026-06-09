@@ -389,8 +389,8 @@ static bool bit_can(enum can_bit_mode mode) {
         case CAN_BIT_MODE_CONNECTED: 
             // send frame from can0 to can1, then can1 to can0, check if received correctly
             const struct can_frame test_frame = {
-                .id = 0x1234,
-                .dlc = 10,
+                .id = 0x123,
+                .dlc = 8,
                 .data = { 'C', 'A', 'N', '0', 'C', 'A', 'N', '1' }
             };
 
