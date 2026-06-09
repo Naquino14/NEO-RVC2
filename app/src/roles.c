@@ -448,3 +448,39 @@ bool role_config()
     LOG_INF("Role %s configuration %s.", role_tostring(), success ? "complete" : "incomplete");
     return success;
 }
+
+static const char* devstat_to_str(devstat_t s) {
+    switch (s) {
+        case DEVSTAT_NOTINSTALLED: return "NOT INSTALLED";
+        case DEVSTAT_NOT_RDY: return "NOT RDY";
+        case DEVSTAT_RDY: return "RDY";
+        case DEVSTAT_ERR: return "ERR";
+        default: return "UNKNOWN";
+    }
+}
+
+static int shell_role_status(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell; (void)argc; (void)argv;
+
+    LOG_INF("--- Device status ---");
+    LOG_INF("LED0\t\t%s", devstat_to_str(role_devs->gpio_led0_stat));
+    LOG_INF("SW0\t\t%s", devstat_to_str(role_devs->gpio_sw0_stat));
+    LOG_INF("LORA\t\t%s", devstat_to_str(role_devs->dev_lora_stat));
+    LOG_INF("DISPLAY\t\t%s", devstat_to_str(role_devs->dev_display_stat));
+    LOG_INF("BLIGHT\t\t%s", devstat_to_str(role_devs->gpio_blight_stat));
+    LOG_INF("CAN0\t\t%s", devstat_to_str(role_devs->dev_can0_stat));
+    LOG_INF("CAN1\t\t%s", devstat_to_str(role_devs->dev_can1_stat));
+    LOG_INF("I2S\t\t%s", devstat_to_str(role_devs->dev_i2s_stat));
+    LOG_INF("UFBII\t\t%s", devstat_to_str(role_devs->dev_ufirebirdii_stat));
+    LOG_INF("SDHC\t\t%s", devstat_to_str(role_devs->dev_sdcard_stat));
+
+    return 0;
+}
+
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_role,
+    SHELL_CMD(status, NULL, "Print device status", shell_role_status),
+    SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(role, &sub_role, "Role utilities", NULL);
