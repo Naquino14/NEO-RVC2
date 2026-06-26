@@ -45,6 +45,9 @@ int can_init(const struct device* dev, const char* devname) {
     int ret = can_calc_timing(dev, 
                             &timing, CAN_BITRATE_KBPS * 1000, 
                             CAN_SAMPLE_POINT_PERMILLE);
+
+    LOG_INF("DEBUG: %s STATE BEFORE: %s", devname, state_tostr(get_can_state(dev)));
+
     if (ret > 0)
         LOG_WRN("Sample point error for %s: %d", devname, ret);
     else if (ret < 0) {
@@ -64,10 +67,21 @@ int can_init(const struct device* dev, const char* devname) {
         return ret;
     }
 
+    ret = can_set_mode(dev, CAN_MODE_NORMAL);
+    if (ret < 0) {
+        LOG_ERR("Failed to set %s mode: %d", devname, ret);
+        return ret;
+    }
+
     ret = can_start(dev);
     if (ret < 0) {
         LOG_ERR("Failed to start %s device: %d", devname, ret);
         return ret;
     }
+
+    k_msleep(250);
+
+    LOG_INF("DEBUG: %s STATE AFTER: %s", devname, state_tostr(get_can_state(dev)));
+
     return 0; 
 }
