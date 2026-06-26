@@ -4,6 +4,9 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/disk_access.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/shell/shell.h>
+
+#include "sys/nrvc2_can.h"
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
@@ -21,11 +24,6 @@ const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
 #if CONFIG_EN_DEV_LORA
 #define LORA_NODE DT_NODELABEL(lora0)
 const struct device * const lora = DEVICE_DT_GET(LORA_NODE);
-#endif
-
-#if CONFIG_EN_DEV_CAN0
-#define CAN_NODE DT_CHOSEN(zephyr_canbus) /// TODO change chosen if second CAN is added
-const struct device * const can0 = DEVICE_DT_GET(CAN_NODE);
 #endif
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
@@ -72,13 +70,11 @@ static role_devs_t m_role_devs_fob = {
     .gpio_blight_stat = DEVSTAT_NOTINSTALLED,
 #endif
 
-#if CONFIG_EN_DEV_CAN0
-    .dev_can0 = can0,
-    .dev_can0_stat = DEVSTAT_NOT_RDY,
-#else
     .dev_can0 = NULL,
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
-#endif
+
+    .dev_can1 = NULL,
+    .dev_can1_stat = DEVSTAT_NOTINSTALLED,
 
     .dev_i2s = NULL,
     .dev_i2s_stat = DEVSTAT_NOTINSTALLED,
@@ -111,6 +107,16 @@ const struct device * const i2s = DEVICE_DT_GET(I2S_NODE);
 #if CONFIG_EN_DEV_UFIREBIRDII
 #define UFIREBIRDII_NODE DT_ALIAS(ufirebirdii)
 const struct device * const ufirebirdii = DEVICE_DT_GET(UFIREBIRDII_NODE);
+#endif
+
+#if CONFIG_EN_DEV_CAN0
+#define CAN0_NODE DT_ALIAS(can0) 
+const struct device * const can0 = DEVICE_DT_GET(CAN0_NODE);
+#endif
+
+#if CONFIG_EN_DEV_CAN1
+#define CAN1_NODE DT_ALIAS(can1)
+const struct device * const can1 = DEVICE_DT_GET(CAN1_NODE);
 #endif
 
 static role_devs_t m_role_devs_trc = {
@@ -153,6 +159,14 @@ static role_devs_t m_role_devs_trc = {
 #if CONFIG_EN_DEV_CAN0
     .dev_can0 = can0,
     .dev_can0_stat = DEVSTAT_NOT_RDY,
+#else
+    .dev_can0 = NULL,
+    .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
+#endif
+
+#if CONFIG_EN_DEV_CAN1
+    .dev_can1 = can1,
+    .dev_can1_stat = DEVSTAT_NOT_RDY,
 #else
     .dev_can0 = NULL,
     .dev_can0_stat  = DEVSTAT_NOTINSTALLED,
@@ -251,18 +265,6 @@ static bool init_common()
         }
     }
 
-    // CAN0
-    if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED)
-        LOG_INF("CAN0\t\tNOT INSTALLED");
-    else if (!device_is_ready(role_devs->dev_can0)) {
-        LOG_ERR("CAN device is not ready");
-        role_devs->dev_can0_stat = DEVSTAT_ERR;
-        rdy = false;
-    } else {
-        role_devs->dev_can0_stat = DEVSTAT_RDY;
-        LOG_INF("CAN\t\tRDY");
-    }
-
     // SDHC
     if (role_devs->dev_sdcard_stat == DEVSTAT_NOTINSTALLED) 
         LOG_INF("SDHC\t\tNOT INSTALLED");
@@ -342,6 +344,56 @@ static bool init_trc_ufirebirdii() {
     return true;
 }
 
+static bool init_trc_can0() {
+    if (role_devs->dev_can0_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("CAN0\t\tNOT INSTALLED");
+        return true;
+    }
+    
+    int ret = device_is_ready(role_devs->dev_can0);
+    if (ret < 0) {
+        LOG_ERR("CAN device is not ready");
+        role_devs->dev_can0_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ret = can_init(role_devs->dev_can0, "CAN0");
+    if (ret < 0) {
+        role_devs->dev_can0_stat = DEVSTAT_ERR;        
+        return false;
+    }
+
+    role_devs->dev_can0_stat = DEVSTAT_RDY;
+    LOG_INF("CAN0\t\tRDY");
+
+    return true;
+}
+
+static bool init_trc_can1() {
+    if (role_devs->dev_can1_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("CAN1\t\tNOT INSTALLED");
+        return true;
+    }
+
+    int ret = device_is_ready(role_devs->dev_can1);
+    if (ret < 0) {
+        LOG_ERR("CAN1 device is not ready");
+        role_devs->dev_can1_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    ret = can_init(role_devs->dev_can1, "CAN1");
+    if (ret < 0) {
+        role_devs->dev_can1_stat = DEVSTAT_ERR;        
+        return false;
+    }
+
+    role_devs->dev_can1_stat = DEVSTAT_RDY;
+    LOG_INF("CAN1\t\tRDY");
+    
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
@@ -356,6 +408,9 @@ static bool init_trc() {
     rdy &= init_trc_i2s();
 
     rdy &= init_trc_ufirebirdii();
+
+    rdy &= init_trc_can0();
+    rdy &= init_trc_can1();
 
     return rdy;
 }
@@ -394,3 +449,39 @@ bool role_config()
     LOG_INF("Role %s configuration %s.", role_tostring(), success ? "complete" : "incomplete");
     return success;
 }
+
+static const char* devstat_to_str(devstat_t s) {
+    switch (s) {
+        case DEVSTAT_NOTINSTALLED: return "NOT INSTALLED";
+        case DEVSTAT_NOT_RDY: return "NOT RDY";
+        case DEVSTAT_RDY: return "RDY";
+        case DEVSTAT_ERR: return "ERR";
+        default: return "UNKNOWN";
+    }
+}
+
+static int shell_role_status(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell; (void)argc; (void)argv;
+
+    LOG_INF("--- Device status ---");
+    LOG_INF("LED0\t\t%s", devstat_to_str(role_devs->gpio_led0_stat));
+    LOG_INF("SW0\t\t%s", devstat_to_str(role_devs->gpio_sw0_stat));
+    LOG_INF("LORA\t\t%s", devstat_to_str(role_devs->dev_lora_stat));
+    LOG_INF("DISPLAY\t\t%s", devstat_to_str(role_devs->dev_display_stat));
+    LOG_INF("BLIGHT\t\t%s", devstat_to_str(role_devs->gpio_blight_stat));
+    LOG_INF("CAN0\t\t%s", devstat_to_str(role_devs->dev_can0_stat));
+    LOG_INF("CAN1\t\t%s", devstat_to_str(role_devs->dev_can1_stat));
+    LOG_INF("I2S\t\t%s", devstat_to_str(role_devs->dev_i2s_stat));
+    LOG_INF("UFBII\t\t%s", devstat_to_str(role_devs->dev_ufirebirdii_stat));
+    LOG_INF("SDHC\t\t%s", devstat_to_str(role_devs->dev_sdcard_stat));
+
+    return 0;
+}
+
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_role,
+    SHELL_CMD(status, NULL, "Print device status", shell_role_status),
+    SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(role, &sub_role, "Role utilities", NULL);

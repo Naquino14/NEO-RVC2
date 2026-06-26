@@ -7,6 +7,13 @@
 #include "../nrvc2_errno.h"
 #include "storage.h"
 
+#define I2S_SAMPLES_PER_BLOCK 64
+#define I2S_CHANNELS 2
+#define I2S_WORD_SIZE_BYTES sizeof(int16_t)
+#define I2S_SAMPLE_RATE_HZ 44100
+#define I2S_NUM_BLOCKS 8
+#define I2S_BLOCK_SIZE (I2S_CHANNELS * I2S_SAMPLES_PER_BLOCK * I2S_WORD_SIZE_BYTES)
+
 LOG_MODULE_REGISTER(audio, LOG_LEVEL_ERR);
 
 typedef struct {
