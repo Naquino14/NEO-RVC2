@@ -20,6 +20,14 @@
                     <I2S0_O_SD_GPIO5>; // serial data, not mode select (DIN)
         };
     };
+
+    i2c0_default: i2c0_default {
+        group1 {
+            pinmux = <I2C0_SDA_GPIO45>, // MDA SDA
+                <I2C0_SCL_GPIO46>;      // MDA SCL
+            drive-open-drain;
+        };
+    };
 };
 
 &i2s0 {
@@ -35,6 +43,13 @@
     status = "okay";
 };
 
+&i2c0 {
+    status = "okay";
+    pinctrl-0 = <&i2c0_default>;
+    pinctrl-names = "default";
+    clock-frequency = <I2C_BITRATE_STANDARD>; // increase later if needed
+};
+
 &uart1 {
     ufbii_gnss: uc6580 {
         compatible = "unicore,uc6580";
@@ -47,7 +62,7 @@
     cs-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>,  // preexisting lora cs
             <&gpio0 17 GPIO_ACTIVE_LOW>,    // CAN module 0
             <&gpio0 26 GPIO_ACTIVE_LOW>,    // CAN module 1
-            <&gpio0 15 GPIO_ACTIVE_LOW>;    // SD card 
+            <&gpio0 15 GPIO_ACTIVE_LOW>;    // SD card
 
     can_over_spi0: can@1 {
         compatible = "microchip,mcp2515";
@@ -56,7 +71,7 @@
         osc-freq = <DT_FREQ_M(8)>;
         int-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
-    }; 
+    };
 
     can_over_spi1: can@2 {
         compatible = "microchip,mcp2515";
