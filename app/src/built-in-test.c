@@ -361,7 +361,7 @@ enum can_bit_mode {
     CAN_BIT_MODE_TALKER, // WIP. Send a frame out of can0 and can1, and check their state
 };
 
-static bool can_tx_ok_flag = false;
+static volatile bool can_tx_ok_flag = false;
 void bit_can_tx_cb(const struct device *dev, int error, void *user_data) {
     char* sender = (char*)user_data;
     if (error < 0) {
@@ -394,6 +394,7 @@ static bool bit_can(enum can_bit_mode mode) {
                 .data = { 'C', 'A', 'N', '0', 'C', 'A', 'N', '1' }
             };
 
+            can_tx_ok_flag = false;
             int ret = can_send(role_devs->dev_can0, &test_frame, K_MSEC(100), bit_can_tx_cb, (void*)"CAN0");
             if (ret < 0) {
                 LOG_ERR("CAN send failed on CAN0: %d", ret);
@@ -401,7 +402,7 @@ static bool bit_can(enum can_bit_mode mode) {
                 return false;
             }
 
-            k_msleep(50); // wait for frame to be rxed
+            k_msleep(4000); // wait for frame to be rxed
 
             if (!can_tx_ok_flag) {
                 LOG_ERR("CAN frame was not transmitted successfully from CAN0");
@@ -409,7 +410,10 @@ static bool bit_can(enum can_bit_mode mode) {
                 return false;
             }
 
-            break;
+            LOG_INF("CAN0\t\tOK");
+            LOG_INF("CAN0\t\tOK");
+
+            return true;
         case CAN_BIT_MODE_TALKER: 
             // TODO: will do this eventually,. I just want basic functionality rn
             break;
