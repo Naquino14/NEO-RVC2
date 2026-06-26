@@ -26,6 +26,7 @@
             pinmux = <I2C0_SDA_GPIO45>, // MDA SDA
                 <I2C0_SCL_GPIO46>;      // MDA SCL
             drive-open-drain;
+            bias-pull-up;
         };
     };
 };
