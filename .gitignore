@@ -60,3 +60,6 @@ sdkconfig.*
 # Zephyr files
 .west
 deps/
+
+# Drawio temp files
+*.bkp
