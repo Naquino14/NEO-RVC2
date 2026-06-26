@@ -425,6 +425,8 @@ static bool bit_can(enum can_bit_mode mode) {
     return false;
 }
 
+#if defined(CONFIG_CAN) && defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
+
 static int shell_bit_can_basic(const struct shell *shell, size_t argc, char **argv) {
     (void)shell;
     (void)argc;
@@ -449,7 +451,9 @@ static int shell_bit_can_talker(const struct shell *shell, size_t argc, char **a
     return bit_can(CAN_BIT_MODE_TALKER) ? 0 : -1;
 }
 
-#endif
+#endif // CAN enabled and both can modules installed
+
+#endif // Device role TRC
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
 static bool bit_display_ssd1306(bool wait_sw0) {
@@ -754,7 +758,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit,
     SHELL_CMD(ufirebirdii, NULL, "Run UFirebird II BIT", shell_bit_ufirebirdii),
 #endif // UFirebirdII
 
-#if defined(CONFIG_CAN)
+#if defined(CONFIG_CAN) && defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
     // can bit submenu
     SHELL_CMD(can, &sub_bit_can, "Run CAN BIT on specific modes", NULL),
 #endif // CAN and can dev enabled
