@@ -673,8 +673,9 @@ bool bit_role_specific_basic() {
 
     ok &= bit_ufirebirdii();
 
-    // code crashes before this point
+#if defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
     ok &= bit_can(CAN_BIT_MODE_CONNECTED); // TODO: Changeme
+#endif // device defined CAN0 and CAN1
 
 #endif
     
