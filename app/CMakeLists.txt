@@ -11,3 +11,11 @@ target_sources(app PRIVATE
     src/sys/audio.c
     src/sys/nrvc2_can.c
 )
+
+target_include_directories(app PRIVATE
+    nrvc2_security/include
+)
+
+target_link_libraries(app PRIVATE 
+    nrvc2_security
+)
