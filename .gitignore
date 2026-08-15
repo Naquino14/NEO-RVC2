@@ -63,3 +63,6 @@ deps/
 
 # Drawio temp files
 *.bkp
+
+# NRVC2 secrets
+/lib/nrvc2_security/keys/
