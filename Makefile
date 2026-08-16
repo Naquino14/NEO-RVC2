@@ -35,10 +35,10 @@ fob:
 
 trc:
 	west build -b heltec_htit_tracker/esp32s3/procpu -s app -p auto -- \
-	-DCONFIG_DEVICE_ROLE=2 \
-	-DEXTRA_CONF_FILE="$(CWD)/app/boards/trc.conf$(foreach libconf,$(LIB_CONFIGS),;$(libconf))" \
-	-DBOARD_ROOT=$(CWD) \
-	-DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_htit_tracker_procpu.overlay 
+		-DCONFIG_DEVICE_ROLE=2 \
+		-DEXTRA_CONF_FILE="$(CWD)/app/boards/trc.conf$(foreach libconf,$(LIB_CONFIGS),;$(libconf))" \
+		-DBOARD_ROOT=$(CWD) \
+		-DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_htit_tracker_procpu.overlay 
 
 flash-fob:
 	west flash --no-rebuild --esp-device /dev/ttyUSB0
