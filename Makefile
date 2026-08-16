@@ -15,6 +15,8 @@ endif
 
 BUILD_CONFIG := build/zephyr/.config
 
+LIB_CONFIGS := $(CWD)/lib/nrvc2_security/nrvc2_security.conf
+
 auto:
 	@if [ "$(BOARD_DEV)" = "/dev/ttyACM0" ]; then \
 		$(MAKE) trc; \
@@ -27,14 +29,14 @@ auto:
 fob:
 	west build -b heltec_wifi_lora32_v3/esp32s3/procpu -s app -p auto -- \
 		-DCONFIG_DEVICE_ROLE=1 \
-		-DEXTRA_CONF_FILE=$(CWD)/app/boards/fob.conf \
+		-DEXTRA_CONF_FILE="$(CWD)/app/boards/fob.conf$(foreach libconf,$(LIB_CONFIGS),;$(libconf))" \
 		-DBOARD_ROOT=$(CWD) \
 		-DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_wifi_lora32_v3_procpu.overlay
 
 trc:
 	west build -b heltec_htit_tracker/esp32s3/procpu -s app -p auto -- \
 	-DCONFIG_DEVICE_ROLE=2 \
-	-DEXTRA_CONF_FILE=$(CWD)/app/boards/trc.conf \
+	-DEXTRA_CONF_FILE="$(CWD)/app/boards/trc.conf$(foreach libconf,$(LIB_CONFIGS),;$(libconf))" \
 	-DBOARD_ROOT=$(CWD) \
 	-DDTC_OVERLAY_FILE=$(CWD)/app/boards/heltec_htit_tracker_procpu.overlay 
 
