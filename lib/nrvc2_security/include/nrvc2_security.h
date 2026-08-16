@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define NRVC2_SECRETS_KEY128_SIZE (sizeof(uint8_t) * 16)
+int nrvc2_security_init();
 
 // API TBD
 

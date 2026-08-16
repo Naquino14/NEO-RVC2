@@ -9,6 +9,7 @@ target_sources(nrvc2_security INTERFACE
 target_include_directories(nrvc2_security INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/keys
+    ${CMAKE_SOURCE_DIR}/include/nrvc2
 )
 
 target_link_directories(nrvc2_security INTERFACE zephyr_interface)

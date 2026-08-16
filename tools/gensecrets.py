@@ -40,7 +40,8 @@ def main(argc, argv):
         sleep(5)
         if argv[1] == "comms":
             # comms key is a 128 base shared secret used for derivation of session keys for comms between the TRC and FOB
-            gen_key_material("NRVC2_KEY_COMMS", 16)
+            gen_key_material("NRVC2_KEY_COMMS_TRC2FOB", 16)
+            gen_key_material("NRVC2_KEY_COMMS_FOB2TRC", 16)
         
         if argv[1] == "id_trc":
             # id_trc is a 64 bit UID for the TRC device
