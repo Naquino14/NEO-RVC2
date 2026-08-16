@@ -3,7 +3,7 @@
 #include <zephyr/logging/log.h>
 
 #include "../roles.h"
-#include "../nrvc2_errno.h"
+#include <nrvc2_errno.h>
 
 #include "storage.h"
 

@@ -5,7 +5,7 @@
 #include <zephyr/drivers/can.h>
 
 #include "../roles.h"
-#include "../nrvc2_errno.h"
+#include <nrvc2_errno.h>
 
 #define CAN_BITRATE_KBPS 500
 #define CAN_SAMPLE_POINT_PERMILLE 875
