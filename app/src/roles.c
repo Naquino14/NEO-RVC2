@@ -5,6 +5,7 @@
 #include <zephyr/storage/disk_access.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/shell/shell.h>
+#include <nrvc2_security.h>
 
 #include "sys/nrvc2_can.h"
 
@@ -294,6 +295,18 @@ static bool init_common()
             role_devs->dev_sdcard_stat = DEVSTAT_RDY;  
             LOG_INF("SDHC\t\tRDY");
         } while (false);
+
+        // Systems
+        // Security
+        {
+            int ret = nrvc2_security_init();
+            if (ret < 0) {
+                LOG_ERR("Security init failed: %d", ret);
+                rdy = false;
+            }
+
+            LOG_INF("SECURITY\tRDY");
+        }
     }
 
     return rdy;
@@ -474,6 +487,9 @@ static int shell_role_status(const struct shell *shell, size_t argc, char **argv
     LOG_INF("I2S\t\t%s", devstat_to_str(role_devs->dev_i2s_stat));
     LOG_INF("UFBII\t\t%s", devstat_to_str(role_devs->dev_ufirebirdii_stat));
     LOG_INF("SDHC\t\t%s", devstat_to_str(role_devs->dev_sdcard_stat));
+
+    LOG_INF("--- Systems status ---");
+    LOG_INF("SECURITY\t\t%s", nrvc2_security_rdy() ? "RDY" : "NOT RDY");
 
     return 0;
 }

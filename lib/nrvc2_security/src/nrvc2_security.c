@@ -32,6 +32,9 @@ static uint8_t session_key_comms_trc2fob[sizeof(NRVC2_KEY_COMMS_TRC2FOB)];
 LOG_MODULE_REGISTER(nrvc2_security);
 
 static bool rdy = false;
+bool nrvc2_security_rdy() {
+    return rdy;
+}
 
 static int regen_session_key(uint8_t* session_key, const uint8_t* base_key, size_t key_len) {
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
