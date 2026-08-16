@@ -7,4 +7,6 @@
 #define ESTORAGEMOUNTED 2001        /// Storage device already mounted 
 #define ESTORAGENOTMOUNTED 2002     /// Storage device not mounted
 
+#define EKEYREGEN 2100              /// Generic key regen error
+
 #endif // NRVC2_ERRNO_H
