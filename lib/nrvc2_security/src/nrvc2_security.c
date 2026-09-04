@@ -36,6 +36,9 @@ bool nrvc2_security_rdy() {
     return rdy;
 }
 
+/// @todo for the future, this needs to be persistent in flash
+static uint64_t sequence_num;
+
 static int regen_session_key(uint8_t* session_key, const uint8_t* base_key, size_t key_len) {
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     if (md_info == NULL)
@@ -68,26 +71,19 @@ int nrvc2_security_init() {
         return -EKEYREGEN;
     }
 
-    // printk("FOB2TRC: 0x%02x", session_key_comms_fob2trc[0]);
-    // for (int i = 1; i < sizeof(session_key_comms_fob2trc); i++)
-    //     printk("%02x", session_key_comms_fob2trc[i]);
-    // printk("\n");
-
     ret = regen_session_key(
         session_key_comms_trc2fob, 
         NRVC2_KEY_COMMS_TRC2FOB,
         sizeof(NRVC2_KEY_COMMS_TRC2FOB)
     );
 
-    // printk("TRC2FOB: 0x%02x", session_key_comms_trc2fob[0]);
-    // for (int i = 1; i < sizeof(session_key_comms_trc2fob); i++)
-    //     printk("%02x", session_key_comms_trc2fob[i]);
-    // printk("\n");
-
     if (ret != 0) {
         LOG_ERR("key regen KEY_COMMS_TRC2FOB failed: %d", ret);
         return -EKEYREGEN;
     }
+
+    /// @todo for the future, read this value from flash memory
+    sequence_num = 0;
 
     // ...
 
