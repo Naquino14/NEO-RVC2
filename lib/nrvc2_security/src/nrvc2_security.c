@@ -94,27 +94,27 @@ int nrvc2_security_init() {
     return 0;
 }
 
-int nrvc2_security_sign(const uint8_t *pt, const size_t pt_size, uint8_t *sig_out) {
+int nrvc2_security_sign(const keyopt_t key, uint8_t* pt, const size_t pt_size, uint8_t* sig_out) {
     return 0;
 }
 
-int nrvc2_security_encrypt_and_sign(const uint8_t *pt, const size_t pt_size, uint8_t *ct_out, uint8_t *sig_out) {
+int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t* sig_out) {
     return 0;
 }
 
-int nrvc2_security_compute_challenge(const uint32_t seq, uint8_t *challenge_out) {
+int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uint8_t* challenge_out) {
     return 0;
 }
 
-int nrvc2_security_do_challenge(const uint8_t *challenge, const uint32_t seq, uint8_t *response_out, uint8_t *sig_out) {
+int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t* sig_out) {
     return 0;
 }
 
-int nrvc2_security_verify(const uint8_t *msg, const uint32_t seq, const uint8_t *sig) {
+int nrvc2_security_verify(const keyopt_t key, const uint8_t* msg, const uint32_t seq, const uint8_t* sig) {
     return 0;
 }
 
-int nrvc2_security_decrypt_and_verify(const uint8_t *ct, const size_t ct_size, const uint32_t seq, const uint8_t *sig, uint8_t *pt_out) {
+int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, const size_t ct_size, const uint32_t seq, const uint8_t* sig, uint8_t* pt_out) {
     return 0;
 }
 
