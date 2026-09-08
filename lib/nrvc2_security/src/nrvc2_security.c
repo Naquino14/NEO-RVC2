@@ -37,7 +37,8 @@ bool nrvc2_security_rdy() {
 }
 
 /// @todo for the future, this needs to be persistent in flash
-static uint64_t sequence_num;
+static uint64_t fob2trc_sequence_num;
+static uint64_t trc2fob_sequence_num;
 
 static int regen_session_key(uint8_t* session_key, const uint8_t* base_key, size_t key_len) {
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
@@ -83,11 +84,36 @@ int nrvc2_security_init() {
     }
 
     /// @todo for the future, read this value from flash memory
-    sequence_num = 0;
+    trc2fob_sequence_num = 0;
+    fob2trc_sequence_num = 0;
 
     // ...
 
     rdy = true;
+    return 0;
+}
+
+int nrvc2_security_sign(const uint8_t *pt, const size_t pt_size, uint8_t *sig_out) {
+    return 0;
+}
+
+int nrvc2_security_encrypt_and_sign(const uint8_t *pt, const size_t pt_size, uint8_t *ct_out, uint8_t *sig_out) {
+    return 0;
+}
+
+int nrvc2_security_compute_challenge(const uint32_t seq, uint8_t *challenge_out) {
+    return 0;
+}
+
+int nrvc2_security_do_challenge(const uint8_t *challenge, const uint32_t seq, uint8_t *response_out, uint8_t *sig_out) {
+    return 0;
+}
+
+int nrvc2_security_verify(const uint8_t *msg, const uint32_t seq, const uint8_t *sig) {
+    return 0;
+}
+
+int nrvc2_security_decrypt_and_verify(const uint8_t *ct, const size_t ct_size, const uint32_t seq, const uint8_t *sig, uint8_t *pt_out) {
     return 0;
 }
 

@@ -2,32 +2,70 @@
 #define __NRVC2_SECRETS_H__
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 bool nrvc2_security_rdy();
 
 int nrvc2_security_init();
 
-// runs from device A first, called by some thread somewhere
-int nrvc2_encrypt_and_sign(const uint8_t* pt, size_t pt_size, uint8_t* ct, size_t* ct_size, uint8_t* sig);
+/// @todo MOVE THIS TO A KCONFIG OPTION
+#define CONFIG_NRVC2_SECURITY_SEQUENCE_WINDOW 10
 
-// when device B hears the frame, it ACKS the frame with a challenge 
-// this computes the challenge itself, and it will be called by a thread somewhere in charge of the lora xceiver
-int nrvc2_challenge(/* ??? */);
+/**
+ * Signs plaintext `pt` of size `pt_size`. Computed MAC signature gets stored in `sig_out`.
+ * @param pt the plaintext to compute a MAC signsture for
+ * @param pt_size the size of the plaintext `pt`
+ * @param sig_out pointer to the output buffer to store the MAC signature
+ * @returns 0 on success
+ */
+int nrvc2_security_sign(const uint8_t* pt, const size_t pt_size, uint8_t* sig_out);
 
-// when device A gets the challenge, it understands it as an ACK from device B
-// the xceiver thread will call this to do the challenge
-// if the challenge was ok, device B will reply with a MAC'd ACK with no challenge (sign only)
-int nrvc2_do_challenge(/* ??? */);
+/**
+ * Encrypts and signs plaintext `pt` of size `pt_size` as ciphertext `ct_out`. Computed MAC signature gets stored in `sig_out`.
+ * @param pt the plaintext to encrypt and compute a mac 
+ * @param pt_len the size of the plaintext `pt`
+ * @param ct_out the buffer to store the ciphertext in, shgould be at least `pt_len` in size
+ * @param sig_out the buffer to store the ciphertext signature
+ * @returns 0 on success
+ */
+int nrvc2_security_encrypt_and_sign(const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t* sig_out);
 
-// signs a message but doesn't encrypt it, saves processing power for things like sending ACKs and errors
-int nrvc2_sign(const uint8_t* pt, size_t pt_size, uint8_t* sig);
+/**
+ * Computes a challenge and stores it in `challenge_out`.
+ * @param seq the incoming sequence number this challenge is tied to
+ * @param challenge_out the challenge output buffer
+ * @returns 0 on success
+ */
+int nrvc2_security_compute_challenge(const uint32_t seq, uint8_t* challenge_out);
 
-// verifies if a sequence is legitimate
-int nrvc2_verify(/* ??? */);
+/**
+ * Computes the response and MAC for a challenge.
+ * @param challenge the incoming challenge text
+ * @param seq the outgoing sequence number this challenge is tied to
+ * @param response_out the buffer to store the challenge response in 
+ * @param sig_out pointer to the buffer to store the MAC signature of the response
+ * @returns 0 on success
+ */
+int nrvc2_security_do_challenge(const uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t* sig_out);
 
-int nrvc2_decrypt_and_verify();
+/**
+ * Verifies if a message is legitimate.
+ * @param msg the message to verify
+ * @param seq the incoming sequence number the message is tied to
+ * @param sig the MAC of the message to verify
+ * @returns 0 on success, -EBADMSG when the message fails to verify
+ */
+int nrvc2_security_verify(const uint8_t* msg, const uint32_t seq, const uint8_t* sig);
 
-// API TBD
+/**
+ * Verifies if a message is legitimate and decrypts it.
+ * @param ct the ciphertext to verify and decrypt
+ * @param ct_size the size of the ciphertext buffer
+ * @param seq the incoming sequence number the message is tied to
+ * @param sig the incoming MAC of the ciphertext to verify
+ * @param pt_out pointer to the buffer to stire the plaintext, should be of size `ct_size`
+ */
+int nrvc2_security_decrypt_and_verify(const uint8_t* ct, const size_t ct_size, const uint32_t seq, const uint8_t* sig, uint8_t* pt_out);
 
 #endif
