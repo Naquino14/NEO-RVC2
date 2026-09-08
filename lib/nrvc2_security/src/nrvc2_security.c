@@ -57,6 +57,39 @@ static int regen_session_key(uint8_t* session_key, const uint8_t* base_key, size
     return ret;
 }
 
+static uint8_t* keyopt_to_keymat(const keyopt_t keyopt) {
+    switch (keyopt) {
+        case NRVC2_KEYOPT_SESS_COMMS_FOB2TRC:
+            return session_key_comms_fob2trc;
+        case NRVC2_KEYOPT_SESS_COMMS_TRC2FOB:
+            return session_key_comms_trc2fob;
+        default:
+            return NULL;
+    }
+}
+
+static size_t keyopt_to_keylen(const keyopt_t keyopt) {
+    switch (keyopt) {
+        case NRVC2_KEYOPT_SESS_COMMS_FOB2TRC:
+            return sizeof(session_key_comms_fob2trc);
+        case NRVC2_KEYOPT_SESS_COMMS_TRC2FOB:
+            return sizeof(session_key_comms_trc2fob);
+        default:
+            return 0;
+    }
+}
+
+static uint64_t keyopt_to_comms_seqn(const keyopt_t keyopt) {
+    switch (keyopt) {
+        case NRVC2_KEYOPT_SESS_COMMS_FOB2TRC:
+            return fob2trc_sequence_num;
+        case NRVC2_KEYOPT_SESS_COMMS_TRC2FOB:
+            return trc2fob_sequence_num;
+        default:
+            return 0xffffffffffffffff;
+    }
+}
+
 int nrvc2_security_init() {
     if (rdy)
         return -EALREADY;
@@ -94,11 +127,62 @@ int nrvc2_security_init() {
     return 0;
 }
 
-int nrvc2_security_sign(const keyopt_t key, uint8_t* pt, const size_t pt_size, uint8_t* sig_out) {
+int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]) {
+    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if (md_info == NULL)
+        return -ECRYPTO;
+
+    uint8_t* keymat = keyopt_to_keymat(key);
+    size_t keylen = keyopt_to_keylen(key);
+
+    int ret = mbedtls_md_hmac(md_info, 
+        keymat, keylen,
+        pt, pt_size, sig_out);
+
+    if (ret == MBEDTLS_ERR_MD_BAD_INPUT_DATA) {
+        LOG_ERR("Invalid parameters supplied to nrvc2_security_sign");
+        return -EINVAL;
+    } else if (ret < 0) {
+        LOG_ERR("Internal mbedtls error during signing: %d", ret);
+        return -ECRYPTO;
+    }
+
     return 0;
 }
 
-int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t* sig_out) {
+int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_CCM_TAG_SIZE]) {
+    uint64_t iv = keyopt_to_comms_seqn(key);
+    uint8_t* keymat = keyopt_to_keymat(key);
+    size_t keylen = keyopt_to_keylen(key);
+    uint64_t seqnum = keyopt_to_comms_seqn(key);
+
+    mbedtls_ccm_context ccm_context;
+    mbedtls_ccm_init(&ccm_context);
+    
+    int ret = mbedtls_ccm_setkey(&ccm_context, MBEDTLS_CIPHER_ID_AES, keymat, keylen * 8);
+    if (ret < 0) {
+        LOG_ERR("Internal mbedtls error during setkey: %d", ret);
+        mbedtls_ccm_free(&ccm_context);
+        return -ECRYPTO;
+    }
+
+    ret = mbedtls_ccm_encrypt_and_tag(&ccm_context,
+        pt_size, 
+        (uint8_t*)&iv,
+        sizeof(uint64_t),
+        (uint8_t*)&seqnum, sizeof(uint64_t),
+        pt,
+        ct_out, 
+        sig_out, NRVC2_SECURITY_CCM_TAG_SIZE);
+
+    if (ret < 0) {
+        LOG_ERR("Internal mbedtls error during encrypt and tag: %d", ret);
+        mbedtls_ccm_free(&ccm_context);
+        return -ECRYPTO;
+    }
+
+    mbedtls_ccm_free(&ccm_context);
+
     return 0;
 }
 
@@ -106,7 +190,7 @@ int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uin
     return 0;
 }
 
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t* sig_out) {
+int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]) {
     return 0;
 }
 
