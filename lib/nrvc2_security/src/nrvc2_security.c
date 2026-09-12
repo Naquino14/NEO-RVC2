@@ -127,7 +127,7 @@ int nrvc2_security_init() {
     return 0;
 }
 
-int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]) {
+int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]) {
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     if (md_info == NULL)
         return -ECRYPTO;
@@ -135,9 +135,10 @@ int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_s
     uint8_t* keymat = keyopt_to_keymat(key);
     size_t keylen = keyopt_to_keylen(key);
 
+    uint8_t buf[NRVC2_SECURITY_TAG_SIZE * 2]; // only use half the digest, temp buffer 
     int ret = mbedtls_md_hmac(md_info, 
         keymat, keylen,
-        pt, pt_size, sig_out);
+        pt, pt_size, buf);
 
     if (ret == MBEDTLS_ERR_MD_BAD_INPUT_DATA) {
         LOG_ERR("Invalid parameters supplied to nrvc2_security_sign");
@@ -147,10 +148,12 @@ int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_s
         return -ECRYPTO;
     }
 
+    memcpy(sig_out, buf, NRVC2_SECURITY_TAG_SIZE);
+
     return 0;
 }
 
-int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_CCM_TAG_SIZE]) {
+int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]) {
     uint64_t iv = keyopt_to_comms_seqn(key);
     uint8_t* keymat = keyopt_to_keymat(key);
     size_t keylen = keyopt_to_keylen(key);
@@ -173,7 +176,7 @@ int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const
         (uint8_t*)&seqnum, sizeof(uint64_t),
         pt,
         ct_out, 
-        sig_out, NRVC2_SECURITY_CCM_TAG_SIZE);
+        sig_out, NRVC2_SECURITY_TAG_SIZE);
 
     if (ret < 0) {
         LOG_ERR("Internal mbedtls error during encrypt and tag: %d", ret);
@@ -190,7 +193,7 @@ int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uin
     return 0;
 }
 
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]) {
+int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]) {
     return 0;
 }
 

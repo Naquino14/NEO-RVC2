@@ -12,8 +12,7 @@ int nrvc2_security_init();
 /// @todo MOVE THIS TO A KCONFIG OPTION
 #define CONFIG_NRVC2_SECURITY_SEQUENCE_WINDOW 10
 
-#define NRVC2_SECURITY_MAC_SIZE 32 // SHA256 MAC
-#define NRVC2_SECURITY_CCM_TAG_SIZE 16
+#define NRVC2_SECURITY_TAG_SIZE 16
 
 typedef enum {
     /// @brief Session communications key from the FOB to the TRC
@@ -30,7 +29,7 @@ typedef enum {
  * @param sig_out pointer to the output buffer to store the MAC signature, must be at least `NRVC2_SECURITY_MAC_SIZE` bytes in size
  * @returns 0 on success, -EINVAL when parameters are invalid
  */
-int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]);
+int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]);
 
 /**
  * Encrypts and signs plaintext `pt` of size `pt_size` as ciphertext `ct_out`. Computed MAC signature gets stored in `sig_out`.
@@ -41,7 +40,7 @@ int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_s
  * @param sig_out the buffer to store the ciphertext signature, must be at least `NRVC2_SECURITY_MAC_SIZE` bytes in size
  * @returns 0 on success, -EINVAL when parameters are invalid
  */
-int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_CCM_TAG_SIZE]);
+int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]);
 
 /**
  * Computes a challenge and stores it in `challenge_out`.
@@ -60,7 +59,7 @@ int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uin
  * @param sig_out pointer to the buffer to store the MAC signature of the response, must be `NRVC2_SECURITY_MAC_SIZE` bytes in size
  * @returns 0 on success, -EINVAL when parameters are invalid
  */
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_MAC_SIZE]);
+int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]);
 
 /**
  * Verifies if a message is legitimate.
