@@ -22,16 +22,6 @@ typedef enum {
 } keyopt_t;
 
 /**
- * Signs plaintext `pt` of size `pt_size`. Computed MAC signature gets stored in `sig_out`.
- * @param key the key material to use in the cryptographic operation
- * @param pt the plaintext to compute a MAC signsture for
- * @param pt_size the size of the plaintext `pt`
- * @param sig_out pointer to the output buffer to store the MAC signature, must be at least `NRVC2_SECURITY_MAC_SIZE` bytes in size
- * @returns 0 on success, -EINVAL when parameters are invalid
- */
-int nrvc2_security_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]);
-
-/**
  * Encrypts and signs plaintext `pt` of size `pt_size` as ciphertext `ct_out`. Computed MAC signature gets stored in `sig_out`.
  * @param key the key material to use in the cryptographic operation
  * @param pt the plaintext to encrypt and compute a mac 
@@ -60,16 +50,6 @@ int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uin
  * @returns 0 on success, -EINVAL when parameters are invalid
  */
 int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]);
-
-/**
- * Verifies if a message is legitimate.
- * @param key the key material to use in the cryptographic operation
- * @param msg the message to verify
- * @param seq the incoming sequence number the message is tied to
- * @param sig the MAC of the message to verify
- * @returns 0 on success, -EBADMSG when the message fails to verify
- */
-int nrvc2_security_verify(const keyopt_t key, const uint8_t* msg, const uint32_t seq, const uint8_t* sig);
 
 /**
  * Verifies if a message is legitimate and decrypts it.
