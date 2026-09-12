@@ -90,6 +90,19 @@ static uint64_t keyopt_to_comms_seqn(const keyopt_t keyopt) {
     }
 }
 
+static void increment_seqn(const keyopt_t keyopt) {
+    switch (keyopt) {
+        case NRVC2_KEYOPT_SESS_COMMS_FOB2TRC:
+            ++fob2trc_sequence_num;
+            break;
+        case NRVC2_KEYOPT_SESS_COMMS_TRC2FOB:
+            ++trc2fob_sequence_num;
+            break;
+        default:
+            break;
+    }
+}
+
 int nrvc2_security_init() {
     if (rdy)
         return -EALREADY;
@@ -185,6 +198,7 @@ int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const
     }
 
     mbedtls_ccm_free(&ccm_context);
+    increment_seqn(key);
 
     return 0;
 }
