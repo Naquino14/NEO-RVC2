@@ -33,25 +33,6 @@ typedef enum {
 int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]);
 
 /**
- * Computes a challenge and stores it in `challenge_out`.
- * @param key the key material to use in the cryptographic operation
- * @param seqn the incoming sequence number this challenge is tied to
- * @param challenge_out the challenge output buffer
- * @returns 0 on success
- */
-int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seqn, uint8_t* challenge_out);
-
-/**
- * Computes the response and MAC for a challenge.
- * @param challenge the incoming challenge text
- * @param seqn the outgoing sequence number this challenge is tied to
- * @param response_out the buffer to store the challenge response in 
- * @param tag_out pointer to the buffer to store the MAC signature of the response, must be `NRVC2_SECURITY_MAC_SIZE` bytes in size
- * @returns 0 on success, -EINVAL when parameters are invalid
- */
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seqn, uint8_t* response_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]);
-
-/**
  * Verifies if a message is legitimate and decrypts it.
  * @param key the key material to use in the cryptographic operation
  * @param ct the ciphertext to verify and decrypt

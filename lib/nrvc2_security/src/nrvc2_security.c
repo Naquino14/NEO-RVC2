@@ -189,14 +189,6 @@ int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const
     return 0;
 }
 
-int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seqn, uint8_t* challenge_out) {
-    return 0;
-}
-
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seqn, uint8_t* response_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]) {
-    return 0;
-}
-
 int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, const size_t ct_size, const uint64_t seqn, const uint8_t tag[NRVC2_SECURITY_TAG_SIZE], uint8_t* pt_out) {
     uint8_t* keymat = keyopt_to_keymat(key);
     size_t keylen = keyopt_to_keylen(key);
