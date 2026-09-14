@@ -103,6 +103,19 @@ static void increment_seqn(const keyopt_t keyopt) {
     }
 }
 
+static void update_seqn(const keyopt_t keyopt, uint64_t new_seqn) {
+    switch (keyopt) {
+        case NRVC2_KEYOPT_SESS_COMMS_FOB2TRC:
+            fob2trc_sequence_num = new_seqn;
+            break;
+        case NRVC2_KEYOPT_SESS_COMMS_TRC2FOB:
+            trc2fob_sequence_num = new_seqn;
+            break;
+        default:
+            break;
+    }
+}
+
 int nrvc2_security_init() {
     if (rdy)
         return -EALREADY;
@@ -140,7 +153,7 @@ int nrvc2_security_init() {
     return 0;
 }
 
-int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]) {
+int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]) {
     uint64_t iv = keyopt_to_comms_seqn(key);
     uint8_t* keymat = keyopt_to_keymat(key);
     size_t keylen = keyopt_to_keylen(key);
@@ -151,41 +164,78 @@ int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const
     
     int ret = mbedtls_ccm_setkey(&ccm_context, MBEDTLS_CIPHER_ID_AES, keymat, keylen * 8);
     if (ret < 0) {
-        LOG_ERR("Internal mbedtls error during setkey: %d", ret);
+        LOG_ERR("Internal mbedtls error during encrypt setkey: %d", ret);
         mbedtls_ccm_free(&ccm_context);
         return -ECRYPTO;
     }
 
     ret = mbedtls_ccm_encrypt_and_tag(&ccm_context,
         pt_size, 
-        (uint8_t*)&iv,
-        sizeof(uint64_t),
+        (uint8_t*)&iv, sizeof(uint64_t),
         (uint8_t*)&seqnum, sizeof(uint64_t),
         pt,
         ct_out, 
-        sig_out, NRVC2_SECURITY_TAG_SIZE);
+        tag_out, NRVC2_SECURITY_TAG_SIZE);
 
+    mbedtls_ccm_free(&ccm_context);
+    
     if (ret < 0) {
         LOG_ERR("Internal mbedtls error during encrypt and tag: %d", ret);
-        mbedtls_ccm_free(&ccm_context);
         return -ECRYPTO;
     }
 
-    mbedtls_ccm_free(&ccm_context);
     increment_seqn(key);
 
     return 0;
 }
 
-int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seq, uint8_t* challenge_out) {
+int nrvc2_security_compute_challenge(const keyopt_t key, const uint32_t seqn, uint8_t* challenge_out) {
     return 0;
 }
 
-int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seq, uint8_t* response_out, uint8_t sig_out[NRVC2_SECURITY_TAG_SIZE]) {
+int nrvc2_security_do_challenge(const keyopt_t key, uint8_t* challenge, const uint32_t seqn, uint8_t* response_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]) {
     return 0;
 }
 
-int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, const size_t ct_size, const uint32_t seq, const uint8_t* sig, uint8_t* pt_out) {
+int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, const size_t ct_size, const uint64_t seqn, const uint8_t tag[NRVC2_SECURITY_TAG_SIZE], uint8_t* pt_out) {
+    uint8_t* keymat = keyopt_to_keymat(key);
+    size_t keylen = keyopt_to_keylen(key);
+    uint64_t seqnum_cur = keyopt_to_comms_seqn(key);
+
+    // verify sequence number first
+    if (seqn <= seqnum_cur || seqn > (seqnum_cur + CONFIG_NRVC2_SECURITY_SEQUENCE_WINDOW))
+        return -ESEQUENCE;
+
+    uint64_t iv = seqn; 
+    
+    mbedtls_ccm_context ccm_context;
+    mbedtls_ccm_init(&ccm_context);
+
+    int ret = mbedtls_ccm_setkey(&ccm_context, MBEDTLS_CIPHER_ID_AES, keymat, keylen * 8);
+    if (ret < 0) {
+        LOG_ERR("Internal mbedtls error during decrypt setkey: %d", ret);
+        mbedtls_ccm_free(&ccm_context);
+        return -ECRYPTO;
+    }
+
+    ret = mbedtls_ccm_auth_decrypt(&ccm_context,
+        ct_size,
+        (uint8_t*)&iv, sizeof(uint64_t),
+        (uint8_t*)&seqn, sizeof(uint64_t),
+        ct,
+        pt_out,
+        tag, NRVC2_SECURITY_TAG_SIZE);
+    
+    mbedtls_ccm_free(&ccm_context);
+
+    if (ret == MBEDTLS_ERR_CCM_AUTH_FAILED)
+        return -EAUTH;
+    else if (ret < 0) {
+        LOG_ERR("Internal mbedtls error during decrypt and auth: %d", ret);
+        return -ECRYPTO;
+    }
+
+    update_seqn(key, seqn);
     return 0;
 }
 
