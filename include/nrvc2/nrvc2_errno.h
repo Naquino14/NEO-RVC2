@@ -9,5 +9,7 @@
 
 #define EKEYREGEN 2100              /// Generic key regen error
 #define ECRYPTO 2101                /// Generic crypto error
+#define ESEQUENCE 2102              /// Sequence number invalid
+#define EAUTH 2103                  /// Invalid tag
 
 #endif // NRVC2_ERRNO_H
