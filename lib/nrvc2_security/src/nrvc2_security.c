@@ -154,10 +154,11 @@ int nrvc2_security_init() {
 }
 
 int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const size_t pt_size, uint8_t* ct_out, uint8_t tag_out[NRVC2_SECURITY_TAG_SIZE]) {
-    uint64_t iv = keyopt_to_comms_seqn(key);
     uint8_t* keymat = keyopt_to_keymat(key);
     size_t keylen = keyopt_to_keylen(key);
     uint64_t seqnum = keyopt_to_comms_seqn(key);
+
+    uint64_t iv = keymat;
 
     mbedtls_ccm_context ccm_context;
     mbedtls_ccm_init(&ccm_context);
