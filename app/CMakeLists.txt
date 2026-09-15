@@ -10,6 +10,7 @@ target_sources(app PRIVATE
     src/sys/storage.c
     src/sys/audio.c
     src/sys/nrvc2_can.c
+    src/sys/comms.c
 )
 
 target_include_directories(app PRIVATE

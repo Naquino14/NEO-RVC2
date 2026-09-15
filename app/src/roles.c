@@ -8,6 +8,7 @@
 #include <nrvc2_security.h>
 
 #include "sys/nrvc2_can.h"
+#include "sys/comms.h"
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
@@ -307,6 +308,17 @@ static bool init_common()
 
             LOG_INF("SECURITY\tRDY");
         }
+
+        // Comms
+        {
+            int ret = comms_init();
+            if (ret < 0) {
+                LOG_ERR("Comms init failed: %d", ret);
+                rdy = false;
+            }
+
+            LOG_INF("COMMS\tRDY");
+        }
     }
 
     return rdy;
@@ -490,6 +502,7 @@ static int shell_role_status(const struct shell *shell, size_t argc, char **argv
 
     LOG_INF("--- Systems status ---");
     LOG_INF("SECURITY\t\t%s", nrvc2_security_rdy() ? "RDY" : "NOT RDY");
+    LOG_INF("COMMS\t\t%s", comms_rdy() ? "RDY" : "NOT RDY");
 
     return 0;
 }
