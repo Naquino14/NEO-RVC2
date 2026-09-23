@@ -24,23 +24,24 @@ static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
     // string starts at idx 2
     // TEMPORARY: before fully fleshing out this system
     // running commands requires sending the full command up to a point
-    static size_t MAX_CMD = 255;
-    uint8_t cmdbuf[MAX_CMD + 1];
+    static size_t MAX_CMD = 256;
+    uint8_t cmdbuf[MAX_CMD];
     size_t cmdlen = 0;
 
-    for (int i = 0; i < argc - 2; i++) {
+    for (int i = 1; i < argc; i++) {
         // strings in argv will always be null terminated, strlen is ok here
-        size_t len = strlen(argv[i + 2]);
-        if (cmdlen > MAX_CMD) {
+        size_t len = strlen(argv[i]);
+        if (cmdlen + len + 1 > MAX_CMD) {
             LOG_WRN("tx shell command: too long!");
             return -EINVAL;
         }
         
-        memcpy(cmdbuf, argv[i + 2], len);
-        cmdlen += len;
+        memcpy(cmdbuf + cmdlen, argv[i], len);
+        cmdbuf[cmdlen + len] = ' ';
+        cmdlen += len + 1;
     }
 
-    cmdbuf[cmdlen] = '\0';
+    cmdbuf[cmdlen - 1] = '\0';
 
     LOG_INF("shell cmd: %s", cmdbuf);
 
