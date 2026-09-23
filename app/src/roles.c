@@ -317,7 +317,7 @@ static bool init_common()
                 rdy = false;
             }
 
-            LOG_INF("COMMS\tRDY");
+            LOG_INF("COMMS\t\tRDY");
         }
     }
 

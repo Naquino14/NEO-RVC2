@@ -60,12 +60,14 @@ typedef struct  {
 extern role_devs_t* role_devs;
 
 #if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_FOB)
-#define LORA_MAX_POW_DBM 14
+#define LORA_MAX_POW_DBM 19 // up to 21±1
 
 #elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == DEF_ROLE_TRC)
-#define LORA_MAX_POW_DBM 18 // up to 21±1
+#define LORA_MAX_POW_DBM 19 // up to 21±1
 
 #endif
+#define LORA_DEFAULT_SF SF_8
+#define LORA_DEFAULT_PREAMBLE_LEN 18
 
 typedef enum {
    ROLE_FOB = DEF_ROLE_FOB,

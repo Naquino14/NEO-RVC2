@@ -22,6 +22,7 @@
 #include "sys/storage.h"
 #include "sys/audio.h"
 #include "sys/nrvc2_can.h"
+#include "sys/comms.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -36,7 +37,7 @@ static void button_pressed(const struct device* dev, struct gpio_callback *cb, u
     sw0_ok = true;
 }
 
-static struct lora_modem_config lora_cfg = {
+static struct lora_modem_config modem_cfg = {
     .frequency = MHZ(915),
     .bandwidth = BW_125_KHZ,
     .datarate = SF_10,
@@ -77,14 +78,16 @@ bool bit_lora(bool call_resp) {
         return true;
     }
 
-    lora_cfg.tx = true;
+    comms_bit_mode(true);
+
+    modem_cfg.tx = true;
     char call[] = "PING";
     if (!call_resp)
-        lora_cfg.tx_power = 2; // 2dbm
+        modem_cfg.tx_power = 2; // 2dbm
     else
-        lora_cfg.tx_power = LORA_MAX_POW_DBM;
+        modem_cfg.tx_power = LORA_MAX_POW_DBM;
     
-    int ret = lora_config(role_devs->dev_lora, &lora_cfg);
+    int ret = lora_config(role_devs->dev_lora, &modem_cfg);
     if (ret < 0) {
         LOG_ERR("LoRa config failed: %d", ret);
         role_devs->dev_lora_stat = DEVSTAT_ERR;
@@ -113,6 +116,8 @@ bool bit_lora(bool call_resp) {
 
         LOG_INF("LoRa Pong received. RSSI: %d, SNR: %d", rssi, snr);
     }
+
+    comms_bit_mode(false);
 
     LOG_INF("LoRa\t\tOK");
     return true;
@@ -758,9 +763,9 @@ void run_bit() {
                 if (!device_is_ready(role_devs->dev_lora)) 
                     printk("Lora device is not ready\n");
         
-                lora_cfg.tx = (role_get() == ROLE_FOB);
+                modem_cfg.tx = (role_get() == ROLE_FOB);
 
-                ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) {
                     printk("Lora config failed: %d\n", ret);
                     break;
@@ -843,8 +848,8 @@ void run_bit() {
                 lora_recv_async(role_devs->dev_lora, NULL, NULL);
                 listening = false;
                 
-                lora_cfg.tx = true; 
-                int ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                modem_cfg.tx = true; 
+                int ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) {
                     printk("Lora rx cb: Set Lora cfg TX failed: %d\n", ret);
                     break;
@@ -858,8 +863,8 @@ void run_bit() {
                     printk("PONG sent successfully.\n");
 
                 k_msleep(100);
-                lora_cfg.tx = false; 
-                ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                modem_cfg.tx = false; 
+                ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) 
                     printk("Lora rx cb: Set Lora cfg RX failed: %d\n", ret);
                 
