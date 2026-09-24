@@ -83,7 +83,7 @@ static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
     // string starts at idx 1
     // TEMPORARY: before fully fleshing out this system
     // running commands requires sending the full command up to a point
-    static size_t MAX_CMD = 256;
+    static size_t MAX_CMD = 128;
     uint8_t cmdbuf[MAX_CMD];
     size_t cmdlen = 0;
 
