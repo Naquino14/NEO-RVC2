@@ -22,6 +22,14 @@ static struct lora_modem_config modem_cfg = {
     .tx_power = LORA_MAX_POW_DBM,
 };
 
+// comms transmit work and workqueue
+#define TX_WORK_QUEUE_PRIO 5
+#define TX_WORK_QUEUE_SIZE 512
+K_THREAD_STACK_DEFINE(tx_work_stack_area, TX_WORK_QUEUE_SIZE);
+static struct k_work_q tx_work_q;
+static struct k_work tx_work;
+static void comms_transmit_work(struct k_work *item);
+
 // forward decl
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
 static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size, int16_t rssi, int8_t snr, void *user_data);
@@ -71,6 +79,14 @@ int comms_init() {
         // maybe depending on the error code this could change in the future
         return ret;
     }
+
+    // if the work queue is already initd and started, dont restart it
+    if ((tx_work_q.flags & K_WORK_QUEUE_STARTED_BIT) == 0) {
+        printk("initing tx work queue\n");
+        k_work_queue_init(&tx_work_q);
+        k_work_queue_start(&tx_work_q, tx_work_stack_area, K_THREAD_STACK_SIZEOF(tx_work_stack_area), TX_WORK_QUEUE_PRIO, NULL);
+        k_work_init(&tx_work, comms_transmit_work);
+    }
     
     k_sem_give(&modem_sem);
     rdy = true;
@@ -116,8 +132,18 @@ int comms_transmit(uint8_t* txbuf, size_t txbuf_len) {
 
     // wip: queue work and exit immediately
     printk("queueing lora tx work...\n");
+
+    int ret = k_work_submit_to_queue(&tx_work_q, &tx_work);
+    if (ret < 0) {
+        LOG_ERR("Failed to submit to work queue: %d", ret);
+        return ret;
+    }
     
     return 0;
+}
+
+static void comms_transmit_work(struct k_work *item) {
+    printk("Im doing comms_transmit_work\n");
 }
 
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
