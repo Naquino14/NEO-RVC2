@@ -82,13 +82,9 @@ int comms_init() {
 
     // if the work queue is already initd and started, dont restart it
     if ((tx_work_q.flags & K_WORK_QUEUE_STARTED) == 0) {
-        printk("initing tx work queue\n");
         k_work_queue_init(&tx_work_q);
-        printk("step 1\n");
         k_work_queue_start(&tx_work_q, tx_work_stack_area, K_THREAD_STACK_SIZEOF(tx_work_stack_area), TX_WORK_QUEUE_PRIO, NULL);
-        printk("step 2\n");
         k_work_init(&tx_work, comms_transmit_work);
-        printk("step 3\n");
     }
     
     k_sem_give(&modem_sem);
