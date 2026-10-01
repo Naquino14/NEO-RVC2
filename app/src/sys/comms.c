@@ -30,6 +30,19 @@ static struct k_work_q tx_work_q;
 static struct k_work tx_work;
 static void comms_transmit_work(struct k_work *item);
 
+#define TX_TIMEOUT_SEC 15
+static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
+
+#define MAX_TX_BUF 128
+
+struct comms_tx_item {
+    struct k_work work;
+    uint8_t tx_buf[MAX_TX_BUF];
+    size_t len;
+};
+
+static struct comms_tx_item tx_item;
+
 // forward decl
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
 static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size, int16_t rssi, int8_t snr, void *user_data);
@@ -98,14 +111,13 @@ static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
     // string starts at idx 1
     // TEMPORARY: before fully fleshing out this system
     // running commands requires sending the full command up to a point
-    static size_t MAX_CMD = 128;
-    uint8_t cmdbuf[MAX_CMD];
+    uint8_t cmdbuf[MAX_TX_BUF];
     size_t cmdlen = 0;
 
     for (int i = 1; i < argc; i++) {
         // strings in argv will always be null terminated, strlen is ok here
         size_t len = strlen(argv[i]);
-        if (cmdlen + len + 1 > MAX_CMD) {
+        if (cmdlen + len + 1 > MAX_TX_BUF) {
             LOG_WRN("tx shell command: too long!");
             return -EINVAL;
         }
@@ -142,7 +154,12 @@ int comms_transmit(uint8_t* txbuf, size_t txbuf_len) {
 }
 
 static void comms_transmit_work(struct k_work *item) {
-    printk("Im doing comms_transmit_work\n");
+    LOG_INF("Transmit work starting...");
+    int ret = k_sem_take(&modem_sem, tx_timeout);
+    if (ret == -EAGAIN) {
+        LOG_WRN("Transmit work timed out. Modem was busy %s", modem_cfg.tx ? "TXing" : "RXing");
+        return;
+    }
 }
 
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
