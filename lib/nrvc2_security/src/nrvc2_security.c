@@ -232,6 +232,10 @@ int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, con
     return 0;
 }
 
+uint64_t nrvc2_security_get_seqn(const keyopt_t key) {
+    return keyopt_to_comms_seqn(key);
+}
+
 int nrvc2_security_deinit() {
     if (!rdy)
         return -EALREADY;
