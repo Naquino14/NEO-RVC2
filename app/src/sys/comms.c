@@ -178,8 +178,6 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
         return ret;
     }
 
-    LOG_INF("Queueing TX work...");
-
     memcpy(tx_item->tx_msg, tx_cmd_buf, tx_cmd_buf_len);
     tx_item->len = tx_cmd_buf_len;
     k_work_init(&tx_item->work, comms_transmit_work);
@@ -194,8 +192,6 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
 }
 
 static void comms_transmit_work(struct k_work *item) {
-    LOG_INF("TX work starting");
-
     // if a lockup occurs here, the work queue stack size is too small :(
 
     struct comms_tx_item* tx_item = CONTAINER_OF(item, struct comms_tx_item, work);
@@ -247,7 +243,7 @@ static void comms_transmit_work(struct k_work *item) {
         set_modem_rx();
 
     k_sem_give(&modem_sem);
-    LOG_INF("TX work complete");
+    LOG_INF("TX done");
 }
 
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
