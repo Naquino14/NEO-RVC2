@@ -23,35 +23,62 @@ static struct lora_modem_config modem_cfg = {
     .tx_power = LORA_MAX_POW_DBM,
 };
 
-// comms transmit work and workqueue
-#define TX_WORK_QUEUE_PRIO 5
-#define TX_WORK_QUEUE_SIZE 2048
-K_THREAD_STACK_DEFINE(tx_work_stack_area, TX_WORK_QUEUE_SIZE);
-static struct k_work_q tx_work_q;
-static void comms_transmit_work(struct k_work *item);
-
-#define TX_TIMEOUT_SEC 15
-static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
-
-static const char MAGIC_HEADER[] = "RVC2";
-#define MAGIC_HEADER_SIZE (sizeof(MAGIC_HEADER) - 1)
+static const char MAGIC_HEADER[] = "NRVC2";
+// no -1 here because there is 1 char for the type of transmission
+// ex: ack is "NRVC2a"
+#define MAGIC_HEADER_SIZE sizeof(MAGIC_HEADER)
 
 #define MAX_CMD_BUF 128
 #define BUF_MAGIC_OFFSET 0
+#define BUF_MAGIC_TYPE_OFFSET MAGIC_HEADER_SIZE
 #define BUF_TAG_OFFSET (BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE)
 #define BUF_SEQN_OFFSET (BUF_TAG_OFFSET + NRVC2_SECURITY_TAG_SIZE)
 #define BUF_DATA_OFFSET (BUF_SEQN_OFFSET + sizeof(uint64_t))
 // max lora buf is the max command buf + tag size + sequence number size + maximum command buffer size
 #define MAX_LORA_BUF (MAGIC_HEADER_SIZE + NRVC2_SECURITY_TAG_SIZE + sizeof(uint64_t) + MAX_CMD_BUF)
 
+// comms transmit work and workqueue
+#define TX_WORK_QUEUE_PRIO 5
+#define TX_WORK_STACK_SIZE 2048 // CHANGEME: if locked up during tx
+K_THREAD_STACK_DEFINE(tx_work_stack_area, TX_WORK_STACK_SIZE);
+static struct k_work_q tx_work_q;
+static void comms_transmit_work(struct k_work *item);
+#define TX_TIMEOUT_SEC 15
+static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
+
 struct comms_tx_item {
+    size_t len;
     struct k_work work;
     uint8_t tx_msg[MAX_CMD_BUF];
-    size_t len;
 };
 
 #define MAX_TX_QUEUE 4
 K_MEM_SLAB_DEFINE_STATIC(tx_work_slab, sizeof(struct comms_tx_item), MAX_TX_QUEUE, 4);
+
+// comms receive work and workqueue
+#define RX_WORK_QUEUE_PRIO 4
+#define RX_WORK_STACK_SIZE 512 // CHANGEME: if locked up during rx
+K_THREAD_STACK_DEFINE(rx_work_stack_area, RX_WORK_STACK_SIZE);
+static struct k_work_q rx_work_q;
+static void comms_receive_work(struct k_work *item);
+
+enum rx_type {
+    COMMAND = 'c',
+    RESPONSE = 'r',
+    ACK = 'a'
+};
+
+struct comms_rx_item {
+    size_t len;
+    int8_t snr;
+    int16_t rssi;
+    enum rx_type type;
+    struct k_work work;
+    uint8_t rx_buf[MAX_LORA_BUF];
+};
+
+#define MAX_RX_QUEUE 8
+K_MEM_SLAB_DEFINE_STATIC(rx_work_slab, sizeof(struct comms_rx_item), MAX_RX_QUEUE, 4);
 
 // forward decl
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
@@ -167,7 +194,7 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
     if (!rdy) 
         return -ENOINIT;
 
-    struct comms_tx_item *tx_item;
+    struct comms_tx_item* tx_item;
     int ret = k_mem_slab_alloc(&tx_work_slab, (void**)&tx_item, K_NO_WAIT);
     if (ret == -ENOMEM) {
         LOG_ERR("TX Queue full");
@@ -184,7 +211,7 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
 
     ret = k_work_submit_to_queue(&tx_work_q, &tx_item->work);
     if (ret < 0) {
-        LOG_ERR("Failed to submit to work queue: %d", ret);
+        LOG_ERR("Failed to submit to tx work queue: %d", ret);
         return ret;
     }
     
@@ -209,9 +236,13 @@ static void comms_transmit_work(struct k_work *item) {
         return;
     }
 
-    memcpy(buf + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE);
+    memcpy(buf + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE - 1);
+    buf[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] = (char)COMMAND;
     memcpy(buf + BUF_TAG_OFFSET, tag, sizeof(tag));
     memcpy(buf + BUF_SEQN_OFFSET, (void*)&seqn_le, sizeof(uint64_t)); 
+
+    // debug
+    printk("comms_transmit_work: post-crypto cmd buf: \"%s\"\n", buf);
 
     ret = k_sem_take(&modem_sem, tx_timeout);
     if (ret == -EAGAIN) {
@@ -248,6 +279,103 @@ static void comms_transmit_work(struct k_work *item) {
 
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
 static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size, int16_t rssi, int8_t snr, void *user_data) {
+    ARG_UNUSED(user_data);
+    ARG_UNUSED(dev);
+
+    // problem
+    // when rxing, it never gives the modem_sem back. 
+    // idea: rename it to tx_sem
+    // and make it so that transmitting work can call set_modem_tx and it will check
+    // if a receive is in progress and if its not it switches the modem mode.
+
+    // this counts as an ISR, if we cant take the semaphore return immediately
+    // this should never fail in theory but better safe than sorry
+    if (k_sem_take(&modem_sem, K_NO_WAIT) < 0) {
+        printk("comms_receive: discarding, modem busy\n"); // debug only
+        return;
+    }
+
+    if (size > MAX_LORA_BUF) {
+        printk("comms_receive: discarding large pkt: %u\n", size);
+        k_sem_give(&modem_sem);
+        return;
+    }
+
+    // command field must be at least 1 byte
+    if (size < MAX_LORA_BUF - MAX_CMD_BUF + 1) {
+        printk("comms_receive: discarding invalid size pkt: %u\n", size); // debug only
+        k_sem_give(&modem_sem);
+        return;
+    }
+
+    // header must start with NRVC2
+    if (strncmp(data + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE - 1) != 0) {
+        printk("comms_receive: discarding invalid header\n"); // debug only
+        k_sem_give(&modem_sem);
+        return;
+    }
+
+    // header must have magic type command, ack, or response
+    bool valid = data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == COMMAND;
+    valid |= data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == ACK;
+    valid |= data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == RESPONSE;
+    if (!valid) {
+        printk("comms_receive: discarding invalid header type\n");
+        k_sem_give(&modem_sem);
+        return;
+    }
+
+    // copy to work
+    struct comms_rx_item* rx_item;
+    int ret = k_mem_slab_alloc(&rx_work_slab, (void**)&rx_item, K_NO_WAIT);
+    if (ret == -ENOMEM) {
+        printk("RX Queue full\n"); // DO NOT USE LOG ON IMMEDIATE MODE IN THIS CALLBACK YOU WILL PANIC THE KERNEL
+        k_sem_give(&modem_sem);
+        return;
+    } else if (ret < 0 || (ret == 0 && rx_item == NULL) ) {
+        printk("Failed to alloc block for TX work item: %d\n", ret);
+        k_sem_give(&modem_sem);
+        return;
+    }
+
+    memcpy(rx_item->rx_buf, data, size);
+    rx_item->len = size;
+    k_work_init(&rx_item->work, comms_receive_work);
+    rx_item->type = (char)data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1];
+    rx_item->rssi = rssi;
+    rx_item->snr = snr;
+
+    ret = k_work_submit_to_queue(&rx_work_q, &rx_item->work);
+    if (ret < 0) 
+        printk("Failed to submit to rx work queue: %d\n", ret);
+        
+    k_sem_give(&modem_sem);
+}
+
+static void comms_receive_work(struct k_work *item) {
+    // if a lockup occurs here, the work queue stack size is too small :(
+
+    struct comms_rx_item* rx_item = CONTAINER_OF(item, struct comms_rx_item, work);
+
+    // get verification tag and seqn
+    uint8_t tag[NRVC2_SECURITY_TAG_SIZE];
+    uint64_t seqn_le;
+    memcpy(tag, rx_item->rx_buf + BUF_TAG_OFFSET, NRVC2_SECURITY_TAG_SIZE);
+    memcpy((uint8_t*)&seqn_le, rx_item->rx_buf + BUF_SEQN_OFFSET, sizeof(uint64_t));
+    seqn_le = sys_le64_to_cpu(seqn_le);
+    
+    // decrypt, verify, and build frame
+    const keyopt_t keyopt = ROLE_IS_FOB ? NRVC2_KEYOPT_SESS_COMMS_FOB2TRC : NRVC2_KEYOPT_SESS_COMMS_TRC2FOB;
+    uint8_t buf[MAX_LORA_BUF];
+    int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf, rx_item->len, seqn_le, tag, buf);
+    if (ret < 0) {
+        // nrvc2 security will complain for us
+        k_mem_slab_free(&rx_work_slab, rx_item);
+        return;
+    }
+
+    // debug
+    printk("decrypted buffer: %s\n", buf);
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_comms,
