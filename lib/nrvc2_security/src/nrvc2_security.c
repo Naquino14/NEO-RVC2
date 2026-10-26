@@ -200,7 +200,6 @@ int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, con
     uint64_t seqnum_cur = keyopt_to_comms_seqn(key);
 
     // verify sequence number first
-    printk("seqn: %llu | seqn_cur: %llu\n", seqn, seqnum_cur);
     if (seqn <= seqnum_cur || seqn > (seqnum_cur + CONFIG_NRVC2_SECURITY_SEQUENCE_WINDOW))
         return -ESEQUENCE;
 
