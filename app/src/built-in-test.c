@@ -39,9 +39,9 @@ static void button_pressed(const struct device* dev, struct gpio_callback *cb, u
 
 static struct lora_modem_config modem_cfg = {
     .frequency = MHZ(915),
-    .bandwidth = BW_125_KHZ,
-    .datarate = SF_10,
-    .preamble_len = 8,
+    .bandwidth = BW_500_KHZ,
+    .datarate = LORA_DEFAULT_SF,
+    .preamble_len = LORA_DEFAULT_PREAMBLE_LEN,
     .coding_rate = CR_4_5,
     .iq_inverted = false,
     .public_network = false,
@@ -70,6 +70,19 @@ bool bit_led() {
     gpio_pin_set_dt(role_devs->gpio_led0, false);
     LOG_INF("LED0\t\tOK");
     return true;
+}
+
+static int shell_bit_lora(const struct shell *shell, size_t argc, char **argv) {
+    (void)shell;
+
+    if (argc == 1)
+        bit_lora(false);
+    else if (argc == 2 && strncmp("ping", argv[argc - 1], sizeof("ping")) == 0)
+        bit_lora(true);
+    else
+        return 1;
+
+    return 0;
 }
 
 bool bit_lora(bool call_resp) {
@@ -908,6 +921,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit,
 #endif // CAN and can dev enabled
 
 #endif // TRC
+
+#if defined(CONFIG_LORA) && defined(CONFIG_EN_DEV_LORA)
+    SHELL_CMD(lora, NULL, "Run basic BIT (transmits low power small packet). Runs TX only by default. Use \"bit lora ping\" to test TX and RX.", shell_bit_lora),
+#endif // LORA BIT Submenu
+
     SHELL_SUBCMD_SET_END
 );
 

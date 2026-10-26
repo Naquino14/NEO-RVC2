@@ -65,7 +65,8 @@ static void comms_receive_work(struct k_work *item);
 enum rx_type {
     COMMAND = 'c',
     RESPONSE = 'r',
-    ACK = 'a'
+    ACK = 'a',
+    PING = 'p',
 };
 
 struct comms_rx_item {
@@ -315,12 +316,14 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
         return;
     }
 
-    // header must have magic type command, ack, or response
-    bool valid = data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == COMMAND;
-    valid |= data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == ACK;
-    valid |= data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] == RESPONSE;
+    // header must have magic type command, ack, ping, or response
+    const size_t type_off = BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1;
+    bool valid = data[type_off] == COMMAND;
+    valid |= data[type_off] == ACK;
+    valid |= data[type_off] == RESPONSE;
+    valid |= data[type_off] == PING;
     if (!valid) {
-        printk("comms_receive: discarding invalid header type\n");
+        printk("comms_receive: discarding invalid header type\n"); // debug only
         k_sem_give(&modem_sem);
         return;
     }
@@ -341,7 +344,7 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
     memcpy(rx_item->rx_buf, data, size);
     rx_item->len = size;
     k_work_init(&rx_item->work, comms_receive_work);
-    rx_item->type = (char)data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1];
+    rx_item->type = (enum rx_type)data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1];
     rx_item->rssi = rssi;
     rx_item->snr = snr;
 
@@ -356,6 +359,13 @@ static void comms_receive_work(struct k_work *item) {
     // if a lockup occurs here, the work queue stack size is too small :(
 
     struct comms_rx_item* rx_item = CONTAINER_OF(item, struct comms_rx_item, work);
+
+    // special case: ping pong
+    // TODO: Wip
+    if (rx_item->type == PING) {
+        LOG_INF("Ping received!");
+        return;
+    }
 
     // get verification tag and seqn
     uint8_t tag[NRVC2_SECURITY_TAG_SIZE];
