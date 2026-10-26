@@ -1,6 +1,7 @@
 #include <string.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
 #include <zephyr/drivers/lora.h>
 #include <zephyr/sys/byteorder.h>
 #include <nrvc2_security.h>
