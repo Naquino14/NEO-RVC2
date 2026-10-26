@@ -7,23 +7,23 @@
 };
 
 &pinctrl {
-    spim2_default: spim2_default {
+    spim3_default: spim3_default {
 		group1 {
-			pinmux = <SPIM2_MISO_GPIO41>,
-				 <SPIM2_SCLK_GPIO39>;
+			pinmux = <SPIM3_MISO_GPIO41>,
+				 <SPIM3_SCLK_GPIO39>;
 		};
 		group2 {
-			pinmux = <SPIM2_MOSI_GPIO40>;
+			pinmux = <SPIM3_MOSI_GPIO40>;
 			output-low;
 		};
 	};
 };
 
-&spi2 {
+&spi3 {
     #address-cells = <1>;
     #size-cells = <0>;
     status = "okay";
-    pinctrl-0 = <&spim2_default>;
+    pinctrl-0 = <&spim3_default>;
     pinctrl-names = "default";
     cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; // SD card GPIO 42 == GPIO1 10
 
