@@ -1,8 +1,8 @@
 // The COMMS key stolen via physical means is no more harmful than the physical device being stolen. 
 // Thus the COMMS key does not need to be secured in flash.
-// If the TRC is stolen, the compromised key will not cause more harm because the vehicle is already stolen. 
+// If the TRC is stolen, the compromised key will not cause more harm because the vehicle is already compromised. 
 // If the FOB is lost or stolen, the TRC can be deactivated and new key material can be created. 
-// A lost or stolen FOB's key material compromise causes no more harm than the physical car key being stolen.
+// A lost or stolen FOB's key material compromise causes no more harm than the physical car key being lost or stolen.
 
 #include <nrvc2_security.h>
 

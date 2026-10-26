@@ -47,6 +47,7 @@ static void comms_transmit_work(struct k_work *item);
 static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
 
 struct comms_tx_item {
+    enum pkt_type type;
     size_t cmd_len;
     struct k_work work;
     uint8_t tx_msg[MAX_CMD_BUF];
@@ -62,18 +63,13 @@ K_THREAD_STACK_DEFINE(rx_work_stack_area, RX_WORK_STACK_SIZE);
 static struct k_work_q rx_work_q;
 static void comms_receive_work(struct k_work *item);
 
-enum rx_type {
-    COMMAND = 'c',
-    RESPONSE = 'r',
-    ACK = 'a',
-    PING = 'p',
-};
+
 
 struct comms_rx_item {
     size_t len;
     int8_t snr;
     int16_t rssi;
-    enum rx_type type;
+    enum pkt_type type;
     struct k_work work;
     uint8_t rx_buf[MAX_LORA_BUF];
 };
@@ -190,10 +186,10 @@ static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
 
     LOG_INF("shell cmd: %s", cmdbuf);
 
-    return comms_transmit(cmdbuf, cmdlen);
+    return comms_transmit(cmdbuf, cmdlen, COMMAND);
 }
 
-int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
+int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len, enum pkt_type type) {
     if (role_devs->dev_lora_stat != DEVSTAT_RDY)
         return -EDEVNOTRDY;
 
@@ -213,6 +209,7 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
 
     memcpy(tx_item->tx_msg, tx_cmd_buf, tx_cmd_buf_len);
     tx_item->cmd_len = tx_cmd_buf_len;
+    tx_item->type = type;
     k_work_init(&tx_item->work, comms_transmit_work);
 
     ret = k_work_submit_to_queue(&tx_work_q, &tx_item->work);
@@ -243,12 +240,9 @@ static void comms_transmit_work(struct k_work *item) {
     }
 
     memcpy(buf + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE - 1);
-    buf[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] = (char)COMMAND;
+    buf[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1] = tx_item->type;
     memcpy(buf + BUF_TAG_OFFSET, tag, sizeof(tag));
     memcpy(buf + BUF_SEQN_OFFSET, (void*)&seqn_le, sizeof(uint64_t)); 
-
-    // debug
-    printk("comms_transmit_work: post-crypto cmd buf (%u): \"%s\"\n", tx_item->cmd_len, buf);
 
     ret = k_sem_take(&modem_sem, tx_timeout);
     if (ret == -EAGAIN) {
@@ -307,8 +301,9 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
         return;
     }
 
-    // command field must be at least 1 byte
-    if (size < MAX_LORA_BUF - MAX_CMD_BUF + 1) {
+    // command field must be at least 1 byte if not ack or ping
+    const size_t type_off = BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1;
+    if (size < MAX_LORA_BUF - MAX_CMD_BUF + 1 && data[type_off] != ACK && data[type_off] != PING) {
         printk("comms_receive: discarding invalid size pkt: %u\n", size); // debug only
         k_sem_give(&modem_sem);
         return;
@@ -322,7 +317,6 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
     }
 
     // header must have magic type command, ack, ping, or response
-    const size_t type_off = BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1;
     bool valid = data[type_off] == COMMAND;
     valid |= data[type_off] == ACK;
     valid |= data[type_off] == RESPONSE;
@@ -349,7 +343,7 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
     memcpy(rx_item->rx_buf, data, size);
     rx_item->len = size;
     k_work_init(&rx_item->work, comms_receive_work);
-    rx_item->type = (enum rx_type)data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1];
+    rx_item->type = (enum pkt_type)data[BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1];
     rx_item->rssi = rssi;
     rx_item->snr = snr;
 
@@ -369,6 +363,7 @@ static void comms_receive_work(struct k_work *item) {
     // TODO: Wip
     if (rx_item->type == PING) {
         LOG_INF("Ping received!");
+        k_mem_slab_free(&rx_work_slab, item);
         return;
     }
     
@@ -382,15 +377,50 @@ static void comms_receive_work(struct k_work *item) {
     // decrypt, verify, and build frame
     const keyopt_t keyopt = ROLE_IS_FOB ? NRVC2_KEYOPT_SESS_COMMS_TRC2FOB : NRVC2_KEYOPT_SESS_COMMS_FOB2TRC;
     uint8_t buf[MAX_LORA_BUF];
-    int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf + BUF_DATA_OFFSET, rx_item->len - BUF_DATA_OFFSET, seqn_le, tag, buf);
+    size_t buf_len = rx_item->len - BUF_DATA_OFFSET;
+    int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf + BUF_DATA_OFFSET, buf_len, seqn_le, tag, buf);
     if (ret < 0) {
-        LOG_ERR("comms_receive_work decrypt failed: %d. cmd size %u", ret, rx_item->len - BUF_DATA_OFFSET);
+        LOG_ERR("comms_receive_work decrypt failed: %d", ret);
         k_mem_slab_free(&rx_work_slab, rx_item);
         return;
     }
 
-    // debug
-    printk("decrypted buffer: %s\n", buf);
+    LOG_INF("PKT RECV: \"%.*s\", RSSI: %d, SNR: %d", buf_len, buf, rx_item->rssi, rx_item->snr);
+
+    /// TODO: use a custom remote shell in the future
+    /// https://docs.zephyrproject.org/latest/samples/subsys/shell/shell_module/README.html#shell-module
+    switch (rx_item->type) {
+        case COMMAND: {
+            // buffer is a command to be executed
+            LOG_INF("Executing \"%s\"", buf);
+            const struct shell* sh = shell_backend_uart_get_ptr();
+            int ret = shell_execute_cmd(sh, buf);
+            if (ret < 0) {
+                LOG_ERR("executing remote command failed: %d", ret);
+                break;
+            }
+
+            // send ack, cant get response without implementing remote shell
+            ret = comms_transmit("", 0, ACK);
+            if (ret < 0) {
+                LOG_ERR("Failed to reply with ACK: %d", ret);
+                break;
+            }
+
+        } break;
+        case RESPONSE: {
+            // print non-empty response
+            LOG_INF("Response \"%s\"", buf);
+        } break;
+        case ACK: {
+            // not implemented
+            LOG_INF("ACK recvd");
+        } break;
+        default:
+        break;
+    }
+
+    k_mem_slab_free(&rx_work_slab, item);
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_comms,

@@ -6,6 +6,13 @@
 
 // wraps lora and nrvc2_security functions
 
+enum pkt_type {
+    COMMAND = 'c',
+    RESPONSE = 'r',
+    ACK = 'a',
+    PING = 'p',
+};
+
 /**
  * Check if comms system is ready
  * @returns true when ready, false otherwise
@@ -27,7 +34,7 @@ int comms_init();
 // this function just take a semaphore and queues work for the internal function transmit_work
 // transmit_work will put the transceiver in receive mode after transmitting
 // and hold on to the semaphore until a valid ACK is received or the transmission times out
-int comms_transmit(uint8_t* txbuf, size_t txbuf_len);
+int comms_transmit(uint8_t* txbuf, size_t txbuf_len, enum pkt_type type);
 
 // takes the transceover semaphore, transmits an ack, puts the receiver in receive mode
 // then increments the semaphore
