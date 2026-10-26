@@ -30,7 +30,7 @@ static const char MAGIC_HEADER[] = "NRVC2";
 
 #define MAX_CMD_BUF 128
 #define BUF_MAGIC_OFFSET 0
-#define BUF_MAGIC_TYPE_OFFSET MAGIC_HEADER_SIZE
+#define BUF_MAGIC_TYPE_OFFSET (MAGIC_HEADER_SIZE - 1)
 #define BUF_TAG_OFFSET (BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE)
 #define BUF_SEQN_OFFSET (BUF_TAG_OFFSET + NRVC2_SECURITY_TAG_SIZE)
 #define BUF_DATA_OFFSET (BUF_SEQN_OFFSET + sizeof(uint64_t))
@@ -47,7 +47,7 @@ static void comms_transmit_work(struct k_work *item);
 static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
 
 struct comms_tx_item {
-    size_t len;
+    size_t cmd_len;
     struct k_work work;
     uint8_t tx_msg[MAX_CMD_BUF];
 };
@@ -57,7 +57,7 @@ K_MEM_SLAB_DEFINE_STATIC(tx_work_slab, sizeof(struct comms_tx_item), MAX_TX_QUEU
 
 // comms receive work and workqueue
 #define RX_WORK_QUEUE_PRIO 4
-#define RX_WORK_STACK_SIZE 512 // CHANGEME: if locked up during rx
+#define RX_WORK_STACK_SIZE 2048 // CHANGEME: if locked up during rx
 K_THREAD_STACK_DEFINE(rx_work_stack_area, RX_WORK_STACK_SIZE);
 static struct k_work_q rx_work_q;
 static void comms_receive_work(struct k_work *item);
@@ -147,6 +147,11 @@ int comms_init() {
         k_work_queue_init(&tx_work_q);
         k_work_queue_start(&tx_work_q, tx_work_stack_area, K_THREAD_STACK_SIZEOF(tx_work_stack_area), TX_WORK_QUEUE_PRIO, NULL);
     }
+
+    if ((rx_work_q.flags & K_WORK_QUEUE_STARTED) == 0) {
+        k_work_queue_init(&rx_work_q);
+        k_work_queue_start(&rx_work_q, rx_work_stack_area, K_THREAD_STACK_SIZEOF(rx_work_stack_area), RX_WORK_QUEUE_PRIO, NULL);
+    }
     
     k_sem_give(&modem_sem);
     rdy = true;
@@ -207,7 +212,7 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len) {
     }
 
     memcpy(tx_item->tx_msg, tx_cmd_buf, tx_cmd_buf_len);
-    tx_item->len = tx_cmd_buf_len;
+    tx_item->cmd_len = tx_cmd_buf_len;
     k_work_init(&tx_item->work, comms_transmit_work);
 
     ret = k_work_submit_to_queue(&tx_work_q, &tx_item->work);
@@ -230,7 +235,7 @@ static void comms_transmit_work(struct k_work *item) {
     uint8_t tag[NRVC2_SECURITY_TAG_SIZE];
     // there still be people using big endian in 2026 😂
     uint64_t seqn_le = sys_cpu_to_le64(nrvc2_security_get_seqn(keyopt));
-    int ret = nrvc2_security_encrypt_and_sign(keyopt, tx_item->tx_msg, tx_item->len, buf + BUF_DATA_OFFSET, tag);
+    int ret = nrvc2_security_encrypt_and_sign(keyopt, tx_item->tx_msg, tx_item->cmd_len, buf + BUF_DATA_OFFSET, tag);
     if (ret < 0) {
         // nrvc2 security will complain for us
         k_mem_slab_free(&tx_work_slab, tx_item);
@@ -243,7 +248,7 @@ static void comms_transmit_work(struct k_work *item) {
     memcpy(buf + BUF_SEQN_OFFSET, (void*)&seqn_le, sizeof(uint64_t)); 
 
     // debug
-    printk("comms_transmit_work: post-crypto cmd buf: \"%s\"\n", buf);
+    printk("comms_transmit_work: post-crypto cmd buf (%u): \"%s\"\n", tx_item->cmd_len, buf);
 
     ret = k_sem_take(&modem_sem, tx_timeout);
     if (ret == -EAGAIN) {
@@ -260,7 +265,7 @@ static void comms_transmit_work(struct k_work *item) {
         return;
     }
 
-    ret = lora_send(role_devs->dev_lora, buf, sizeof(buf));
+    ret = lora_send(role_devs->dev_lora, buf, BUF_DATA_OFFSET + tx_item->cmd_len);
     if (ret < 0) {
         LOG_ERR("TX work LoRa send failed: %d, disabling comms", ret);
         rdy = false; // disabling, dont release semaphore
@@ -359,14 +364,14 @@ static void comms_receive_work(struct k_work *item) {
     // if a lockup occurs here, the work queue stack size is too small :(
 
     struct comms_rx_item* rx_item = CONTAINER_OF(item, struct comms_rx_item, work);
-
+    
     // special case: ping pong
     // TODO: Wip
     if (rx_item->type == PING) {
         LOG_INF("Ping received!");
         return;
     }
-
+    
     // get verification tag and seqn
     uint8_t tag[NRVC2_SECURITY_TAG_SIZE];
     uint64_t seqn_le;
@@ -375,11 +380,11 @@ static void comms_receive_work(struct k_work *item) {
     seqn_le = sys_le64_to_cpu(seqn_le);
     
     // decrypt, verify, and build frame
-    const keyopt_t keyopt = ROLE_IS_FOB ? NRVC2_KEYOPT_SESS_COMMS_FOB2TRC : NRVC2_KEYOPT_SESS_COMMS_TRC2FOB;
+    const keyopt_t keyopt = ROLE_IS_FOB ? NRVC2_KEYOPT_SESS_COMMS_TRC2FOB : NRVC2_KEYOPT_SESS_COMMS_FOB2TRC;
     uint8_t buf[MAX_LORA_BUF];
-    int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf, rx_item->len, seqn_le, tag, buf);
+    int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf + BUF_DATA_OFFSET, rx_item->len - BUF_DATA_OFFSET, seqn_le, tag, buf);
     if (ret < 0) {
-        // nrvc2 security will complain for us
+        LOG_ERR("comms_receive_work decrypt failed: %d. cmd size %u", ret, rx_item->len - BUF_DATA_OFFSET);
         k_mem_slab_free(&rx_work_slab, rx_item);
         return;
     }

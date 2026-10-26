@@ -144,9 +144,13 @@ int nrvc2_security_init() {
     }
 
     /// @todo for the future, read this value from flash memory
+#if defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == 1) // FOB
     trc2fob_sequence_num = 0;
+    fob2trc_sequence_num = 1;
+#elif defined(CONFIG_DEVICE_ROLE) && (CONFIG_DEVICE_ROLE == 2) // TRC
+    trc2fob_sequence_num = 1;
     fob2trc_sequence_num = 0;
-
+#endif
     // ...
 
     rdy = true;
@@ -196,6 +200,7 @@ int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, con
     uint64_t seqnum_cur = keyopt_to_comms_seqn(key);
 
     // verify sequence number first
+    printk("seqn: %llu | seqn_cur: %llu\n", seqn, seqnum_cur);
     if (seqn <= seqnum_cur || seqn > (seqnum_cur + CONFIG_NRVC2_SECURITY_SEQUENCE_WINDOW))
         return -ESEQUENCE;
 
