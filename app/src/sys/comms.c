@@ -64,8 +64,6 @@ K_THREAD_STACK_DEFINE(rx_work_stack_area, RX_WORK_STACK_SIZE);
 static struct k_work_q rx_work_q;
 static void comms_receive_work(struct k_work *item);
 
-
-
 struct comms_rx_item {
     size_t len;
     int8_t snr;
