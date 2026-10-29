@@ -98,28 +98,23 @@ static K_SEM_DEFINE(modem_sem, 0, 1);
  * ISR friendly iff timeout == K_NO_WAIT
  */
 static int set_modem_rx(k_timeout_t timeout) {
-    int ret;
-    
-    do {
-        if (!rdy) {
-            ret = -ENOINIT;
-            break;
-        }
-        
-        ret = k_sem_take(&modem_sem, timeout);
-        if (ret < 0)
-        break;
+    if (!rdy)
+        return -ENOINIT;
 
-        if (modem_cfg.tx) {
-            modem_cfg.tx = false;
-            ret = lora_config(role_devs->dev_lora, &modem_cfg);
-            if (ret < 0)
-                break;
+    int ret = k_sem_take(&modem_sem, timeout);
+    if (ret < 0)
+        return ret;
     
-            ret = lora_recv_async(role_devs->dev_lora, comms_receive, NULL);
+    if (modem_cfg.tx) {
+        modem_cfg.tx = false;
+        ret = lora_config(role_devs->dev_lora, &modem_cfg);
+        if (ret < 0) {
+            k_sem_give(&modem_sem);
+            return ret;
         }
-
-    } while (false);
+    
+        ret = lora_recv_async(role_devs->dev_lora, comms_receive, NULL);
+    }
 
     k_sem_give(&modem_sem);
 
@@ -444,6 +439,7 @@ static void comms_receive_work(struct k_work *item) {
     switch (rx_item->type) {
         case COMMAND: {
             // buffer is a command to be executed
+            buf[buf_len] = '\0';
             LOG_INF("Executing \"%s\"", buf);
             const struct shell* sh = shell_backend_uart_get_ptr();
             int ret = shell_execute_cmd(sh, buf);
