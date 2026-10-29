@@ -23,7 +23,7 @@ bool comms_rdy();
  * Put comms system in BIT mode
  * @param bit_running true if BIT is running, false to re-init comms system
  */
-void comms_bit_mode(bool bit_running);
+int comms_bit_mode(bool bit_running);
 
 // sets up transmit work queue (with timeouts, priorities?), any structs, register receive interrupts
 int comms_init();

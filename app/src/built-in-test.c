@@ -73,7 +73,7 @@ bool bit_led() {
 }
 
 static int shell_bit_lora(const struct shell *shell, size_t argc, char **argv) {
-    (void)shell;
+    ARG_UNUSED(shell);
 
     if (argc == 1)
         bit_lora(false);
@@ -91,7 +91,12 @@ bool bit_lora(bool call_resp) {
         return true;
     }
 
-    comms_bit_mode(true);
+    int ret = comms_bit_mode(true);
+    if (ret < 0) {
+        LOG_ERR("cannot put comms system in BIT mode: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
+        return false;
+    }
 
     modem_cfg.tx = true;
     char call[] = "PING";
@@ -100,7 +105,7 @@ bool bit_lora(bool call_resp) {
     else
         modem_cfg.tx_power = LORA_MAX_POW_DBM;
     
-    int ret = lora_config(role_devs->dev_lora, &modem_cfg);
+    ret = lora_config(role_devs->dev_lora, &modem_cfg);
     if (ret < 0) {
         LOG_ERR("LoRa config failed: %d", ret);
         role_devs->dev_lora_stat = DEVSTAT_ERR;
@@ -130,7 +135,12 @@ bool bit_lora(bool call_resp) {
         LOG_INF("LoRa Pong received. RSSI: %d, SNR: %d", rssi, snr);
     }
 
-    comms_bit_mode(false);
+    ret = comms_bit_mode(false);
+    if (ret < 0) {
+        LOG_ERR("Could not disable BIT mode in comms system: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
+        return false;
+    }
 
     LOG_INF("LoRa\t\tOK");
     return true;

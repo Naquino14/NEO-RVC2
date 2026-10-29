@@ -44,8 +44,8 @@ static const char MAGIC_HEADER[] = "NRVC2";
 K_THREAD_STACK_DEFINE(tx_work_stack_area, TX_WORK_STACK_SIZE);
 static struct k_work_q tx_work_q;
 static void comms_transmit_work(struct k_work *item);
-#define TX_TIMEOUT_SEC 15
-static const k_timeout_t tx_timeout = K_SECONDS(TX_TIMEOUT_SEC);
+#define TX_TIMEOUT_MSEC 800
+static const k_timeout_t tx_timeout = K_MSEC(TX_TIMEOUT_MSEC);
 
 struct comms_tx_item {
     enum pkt_type type;
@@ -80,28 +80,64 @@ K_MEM_SLAB_DEFINE_STATIC(rx_work_slab, sizeof(struct comms_rx_item), MAX_RX_QUEU
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
 static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size, int16_t rssi, int8_t snr, void *user_data);
 
-/**
- * THIS FUNCTION ASSUMES CALLER HAS TAKEN modem_sem
- */
-static int set_modem_rx() {
-    if (modem_cfg.tx) {
-        modem_cfg.tx = false;
-        int ret = lora_config(role_devs->dev_lora, &modem_cfg);
-        if (ret < 0)
-            return ret;
-
-        ret = lora_recv_async(role_devs->dev_lora, comms_receive, NULL);
-        if (ret < 0)
-            return ret;
-    }
-
-    return 0;
+static bool rdy = false;
+bool comms_rdy() {
+    return rdy;
 }
 
 /**
- * THIS FUNCTION ASSUMES CALLER HAS TAKEN modem_sem
+ * The comms modem semaphore. To prevent reconfiguring the modem during active transmit and receive.
+ * To be taken when:
+ * - idle in RX mode and need to process TX work by reconfiguring to TX mode
+ * - done processing TX work queue and need to reconfigure for receive mode
+ * - active in RX mode, and need to prevent TX work from reconfiguring while receiving
  */
-static int set_modem_tx() {
+static K_SEM_DEFINE(modem_sem, 0, 1);
+
+/**
+ * ISR friendly iff timeout == K_NO_WAIT
+ */
+static int set_modem_rx(k_timeout_t timeout) {
+    int ret;
+    
+    do {
+        if (!rdy) {
+            ret = -ENOINIT;
+            break;
+        }
+        
+        ret = k_sem_take(&modem_sem, timeout);
+        if (ret < 0)
+        break;
+
+        if (modem_cfg.tx) {
+            modem_cfg.tx = false;
+            ret = lora_config(role_devs->dev_lora, &modem_cfg);
+            if (ret < 0)
+                break;
+    
+            ret = lora_recv_async(role_devs->dev_lora, comms_receive, NULL);
+        }
+
+    } while (false);
+
+    k_sem_give(&modem_sem);
+
+    return ret;
+}
+
+/**
+ * CALLEE MUST GIVE BACK modem_sem
+ * ISR friendly iff timeout == K_NO_WAIT
+ */
+static int set_modem_tx(k_timeout_t timeout) {
+    if (!rdy)
+        return -ENOINIT;
+
+    int ret = k_sem_take(&modem_sem, timeout);
+    if (ret < 0)
+        return ret; 
+
     if (!modem_cfg.tx) {
         modem_cfg.tx = true;
         lora_recv_async(role_devs->dev_lora, NULL, NULL);
@@ -110,32 +146,23 @@ static int set_modem_tx() {
     return 0;
 }
 
-static bool rdy = false;
-bool comms_rdy() {
-    return rdy;
-}
-
-void comms_bit_mode(bool bit_running) {
+int comms_bit_mode(bool bit_running) {
     // BIT needs to configure the modem with its own settings
     // if the comms system is in async RX mode, the LoRa modem is not 
     // configurable
-    if (bit_running && modem_cfg.tx == false)
-        set_modem_tx();
-    else
-        comms_init();
+    if (bit_running) {
+        int ret = set_modem_tx(K_NO_WAIT);
+        if (ret == 0)
+            k_sem_give(&modem_sem);
+        
+        return ret;
+    } else
+        return set_modem_rx(K_FOREVER);
 }
 
-K_SEM_DEFINE(modem_sem, 0, 1);
-
 int comms_init() {
-    // setup async reception
-    int ret = set_modem_rx();
-    if (ret < 0) {
-        LOG_ERR("%s: Could not put LoRa modem in RX mode: %d", __func__, ret);
-        // do not error out device, something else could have happened
-        // maybe depending on the error code this could change in the future
-        return ret;
-    }
+    if (rdy)
+        return -EALREADY;
 
     // if the work queue is already initd and started, dont restart it
     if ((tx_work_q.flags & K_WORK_QUEUE_STARTED) == 0) {
@@ -147,18 +174,31 @@ int comms_init() {
         k_work_queue_init(&rx_work_q);
         k_work_queue_start(&rx_work_q, rx_work_stack_area, K_THREAD_STACK_SIZEOF(rx_work_stack_area), RX_WORK_QUEUE_PRIO, NULL);
     }
-    
+
+    // to call set_modem_rx, this needs to start in tx.
+    modem_cfg.tx = true;
+    k_sem_reset(&modem_sem);
     k_sem_give(&modem_sem);
     rdy = true;
+
+    // setup async reception
+    int ret = set_modem_rx(K_NO_WAIT);
+    if (ret == -EBUSY) {
+        LOG_ERR("%s: Could not put lora modem in RX mode, modem likely busy", __func__);
+        return -EBUSY;
+    } else if (ret < 0) {
+        LOG_ERR("%s: Could not put LoRa modem in RX mode: %d", __func__, ret);
+        // do not error out device, something else could have happened
+        // maybe depending on the error code this could change in the future
+        return ret;
+    }
 
     return 0;
 }
 
 
 static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
-    // string starts at idx 1
-    // TEMPORARY: before fully fleshing out this system
-    // running commands requires sending the full command up to a point
+    // string starts at argc[1]
     uint8_t cmdbuf[MAX_CMD_BUF];
     size_t cmdlen = 0;
 
@@ -183,8 +223,6 @@ static int shell_comms_tx(const struct shell* shell, size_t argc, char** argv) {
 
     cmdbuf[cmdlen - 1] = '\0';
 
-    LOG_INF("shell cmd: %s", cmdbuf);
-
     return comms_transmit(cmdbuf, cmdlen, COMMAND);
 }
 
@@ -206,7 +244,13 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len, enum pkt_type typ
         return ret;
     }
 
-    memcpy(tx_item->tx_msg, tx_cmd_buf, tx_cmd_buf_len);
+    // ACK and PING are empty
+    if (tx_cmd_buf == NULL) {
+        *tx_item->tx_msg = '\0';
+        tx_cmd_buf_len = 0;
+    }
+    else
+        memcpy(tx_item->tx_msg, tx_cmd_buf, tx_cmd_buf_len);
     tx_item->cmd_len = tx_cmd_buf_len;
     tx_item->type = type;
     k_work_init(&tx_item->work, comms_transmit_work);
@@ -214,6 +258,7 @@ int comms_transmit(uint8_t* tx_cmd_buf, size_t tx_cmd_buf_len, enum pkt_type typ
     ret = k_work_submit_to_queue(&tx_work_q, &tx_item->work);
     if (ret < 0) {
         LOG_ERR("Failed to submit to tx work queue: %d", ret);
+        k_mem_slab_free(&tx_work_slab, tx_item);
         return ret;
     }
     
@@ -243,15 +288,12 @@ static void comms_transmit_work(struct k_work *item) {
     memcpy(buf + BUF_TAG_OFFSET, tag, sizeof(tag));
     memcpy(buf + BUF_SEQN_OFFSET, (void*)&seqn_le, sizeof(uint64_t)); 
 
-    ret = k_sem_take(&modem_sem, tx_timeout);
+    ret = set_modem_tx(tx_timeout);
     if (ret == -EAGAIN) {
-        LOG_WRN("TX Work: Modem Busy %s", modem_cfg.tx ? "TXing" : "RXing");
+        LOG_WRN("TX Work: Modem still busy %s after %d ms waiting", modem_cfg.tx ? "TXing" : "RXing", TX_TIMEOUT_MSEC);
         k_mem_slab_free(&tx_work_slab, tx_item);
         return;
-    }
-
-    ret = set_modem_tx();
-    if (ret < 0) {
+    } else if (ret < 0) {
         LOG_ERR("TX Work: Cant set TX mode: %d, disabling comms", ret);
         rdy = false; // disabling, dont release semaphore
         k_mem_slab_free(&tx_work_slab, tx_item);
@@ -269,23 +311,60 @@ static void comms_transmit_work(struct k_work *item) {
     k_mem_slab_free(&tx_work_slab, tx_item);
 
     // go back to receiving if nothing is left in the slab
-    if (tx_work_slab.info.num_used == 0)
-        set_modem_rx();
-
+    // its OK to release the semaphore here and immediately re-take it because work items
+    // in the TX queue run in series, and the modem cant call comms_receive in TX mode
     k_sem_give(&modem_sem);
-    LOG_INF("TX done");
+    if (tx_work_slab.info.num_used == 0)
+        set_modem_rx(K_FOREVER);
+}
+
+static bool rx_frame_valid(const uint8_t* data, uint16_t size) {
+    if (size > MAX_LORA_BUF) {
+        printk("%s: discarding large pkt: %u\n", __func__, size); // debug only
+        return false;
+    }
+
+    // command field must be at least 1 byte if not ack or ping
+    if (size < MAGIC_HEADER_SIZE) {
+        printk("%s: discarding invalid size pkt: %u\n", __func__, size); // debug only
+        return false;
+    }
+
+    // header must start with NRVC2
+    if (memcmp(data + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE - 1) != 0) {
+        printk("%s: discarding invalid header\n", __func__); // debug only
+        return false;
+    }
+
+    switch ((enum pkt_type)data[BUF_MAGIC_TYPE_OFFSET]) {
+        case COMMAND:
+        case RESPONSE:
+            if (size <= BUF_DATA_OFFSET) { // must be at least 1 byte
+                printk("%s: discarding invalid COMMAND or RESPONSE frame\n", __func__);
+                return false;
+            }
+            return true;
+
+        case ACK:
+            if (size != BUF_DATA_OFFSET) { // payload size must be 0
+                printk("%s: discarding invalid ACK frame\n", __func__);
+                return false;
+            }
+            return true;
+
+        case PING:
+            return true; /// TODO: revise later
+
+        default:
+            printk("%s: discarding frame with invalid header\n", __func__);
+            return false;
+    }
 }
 
 /// FUTURE: When updating zephyr, this return type will need to change to int; 
 static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size, int16_t rssi, int8_t snr, void *user_data) {
     ARG_UNUSED(user_data);
     ARG_UNUSED(dev);
-
-    // problem
-    // when rxing, it never gives the modem_sem back. 
-    // idea: rename it to tx_sem
-    // and make it so that transmitting work can call set_modem_tx and it will check
-    // if a receive is in progress and if its not it switches the modem mode.
 
     // this counts as an ISR, if we cant take the semaphore return immediately
     // this should never fail in theory but better safe than sorry
@@ -294,34 +373,8 @@ static void comms_receive(const struct device *dev, uint8_t *data, uint16_t size
         return;
     }
 
-    if (size > MAX_LORA_BUF) {
-        printk("comms_receive: discarding large pkt: %u\n", size);
-        k_sem_give(&modem_sem);
-        return;
-    }
-
-    // command field must be at least 1 byte if not ack or ping
-    const size_t type_off = BUF_MAGIC_OFFSET + MAGIC_HEADER_SIZE - 1;
-    if (size < MAX_LORA_BUF - MAX_CMD_BUF + 1 && data[type_off] != ACK && data[type_off] != PING) {
-        printk("comms_receive: discarding invalid size pkt: %u\n", size); // debug only
-        k_sem_give(&modem_sem);
-        return;
-    }
-
-    // header must start with NRVC2
-    if (strncmp(data + BUF_MAGIC_OFFSET, MAGIC_HEADER, MAGIC_HEADER_SIZE - 1) != 0) {
-        printk("comms_receive: discarding invalid header\n"); // debug only
-        k_sem_give(&modem_sem);
-        return;
-    }
-
-    // header must have magic type command, ack, ping, or response
-    bool valid = data[type_off] == COMMAND;
-    valid |= data[type_off] == ACK;
-    valid |= data[type_off] == RESPONSE;
-    valid |= data[type_off] == PING;
-    if (!valid) {
-        printk("comms_receive: discarding invalid header type\n"); // debug only
+    if (!rx_frame_valid(data, size)) {
+        printk("%s: discarding invalid frame\n", __func__);
         k_sem_give(&modem_sem);
         return;
     }
@@ -362,7 +415,7 @@ static void comms_receive_work(struct k_work *item) {
     // TODO: Wip
     if (rx_item->type == PING) {
         LOG_INF("Ping received!");
-        k_mem_slab_free(&rx_work_slab, item);
+        k_mem_slab_free(&rx_work_slab, rx_item);
         return;
     }
     
@@ -379,12 +432,12 @@ static void comms_receive_work(struct k_work *item) {
     size_t buf_len = rx_item->len - BUF_DATA_OFFSET;
     int ret = nrvc2_security_decrypt_and_verify(keyopt, rx_item->rx_buf + BUF_DATA_OFFSET, buf_len, seqn_le, tag, buf);
     if (ret < 0) {
-        LOG_ERR("comms_receive_work decrypt failed: %d", ret);
+        LOG_ERR("%s decrypt failed: %d", __func__, ret);
         k_mem_slab_free(&rx_work_slab, rx_item);
         return;
     }
 
-    LOG_INF("PKT RECV: \"%.*s\", RSSI: %d, SNR: %d", buf_len, buf, rx_item->rssi, rx_item->snr);
+    LOG_INF("PKT RECV. SEQN: %llu, RSSI: %d, SNR: %d", seqn_le, rx_item->rssi, rx_item->snr);
 
     /// TODO: use a custom remote shell in the future
     /// https://docs.zephyrproject.org/latest/samples/subsys/shell/shell_module/README.html#shell-module
@@ -400,7 +453,7 @@ static void comms_receive_work(struct k_work *item) {
             }
 
             // send ack, cant get response without implementing remote shell
-            ret = comms_transmit("", 0, ACK);
+            ret = comms_transmit(NULL, 0, ACK);
             if (ret < 0) {
                 LOG_ERR("Failed to reply with ACK: %d", ret);
                 break;
@@ -419,7 +472,7 @@ static void comms_receive_work(struct k_work *item) {
         break;
     }
 
-    k_mem_slab_free(&rx_work_slab, item);
+    k_mem_slab_free(&rx_work_slab, rx_item);
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_comms,
