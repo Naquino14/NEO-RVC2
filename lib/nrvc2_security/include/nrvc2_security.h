@@ -43,4 +43,10 @@ int nrvc2_security_encrypt_and_sign(const keyopt_t key, const uint8_t* pt, const
  */
 int nrvc2_security_decrypt_and_verify(const keyopt_t key, const uint8_t* ct, const size_t ct_size, const uint64_t seqn, const uint8_t tag[NRVC2_SECURITY_TAG_SIZE], uint8_t* pt_out);
 
+/**
+ * Get the sequence number for a given key.
+ * @param key the key material sequence number to fetch
+ * @returns `key`'s sequence number
+ */
+uint64_t nrvc2_security_get_seqn(const keyopt_t key);
 #endif
