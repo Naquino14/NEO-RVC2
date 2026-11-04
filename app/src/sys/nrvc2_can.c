@@ -12,7 +12,7 @@
 
 LOG_MODULE_REGISTER(can);
 
-static char* state_tostr(enum can_state state) {
+const char* can_state_tostr(enum can_state state) {
     switch (state) {
         case CAN_STATE_ERROR_ACTIVE:
             return "ERROR_ACTIVE";
@@ -46,8 +46,6 @@ int can_init(const struct device* dev, const char* devname) {
                             &timing, CAN_BITRATE_KBPS * 1000, 
                             CAN_SAMPLE_POINT_PERMILLE);
 
-    LOG_INF("DEBUG: %s STATE BEFORE: %s", devname, state_tostr(get_can_state(dev)));
-
     if (ret > 0)
         LOG_WRN("Sample point error for %s: %d", devname, ret);
     else if (ret < 0) {
@@ -78,10 +76,6 @@ int can_init(const struct device* dev, const char* devname) {
         LOG_ERR("Failed to start %s device: %d", devname, ret);
         return ret;
     }
-
-    k_msleep(250);
-
-    LOG_INF("DEBUG: %s STATE AFTER: %s", devname, state_tostr(get_can_state(dev)));
 
     return 0; 
 }

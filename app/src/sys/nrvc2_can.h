@@ -8,4 +8,6 @@ int can_init(const struct device* dev, const char* devname);
 
 enum can_state get_can_state(const struct device* dev);
 
+const char* can_state_tostr(enum can_state state);
+
 #endif // !CAN_H
