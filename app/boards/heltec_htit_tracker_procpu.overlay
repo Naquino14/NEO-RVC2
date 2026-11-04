@@ -69,7 +69,7 @@
         compatible = "microchip,mcp2515";
         reg = <1>;
         status = "okay";
-        osc-freq = <DT_FREQ_M(8)>;
+        osc-freq = <DT_FREQ_M(16)>;
         int-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
     };
@@ -78,7 +78,7 @@
         compatible = "microchip,mcp2515";
         reg = <2>;
         status = "okay";
-        osc-freq = <DT_FREQ_M(8)>;
+        osc-freq = <DT_FREQ_M(16)>;
         int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <DT_FREQ_M(10)>;
     };
