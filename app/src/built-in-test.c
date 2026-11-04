@@ -12,6 +12,7 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/drivers/can.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/drivers/can.h>
 
 #include <drivers/ufirebirdii/ufirebirdii.h>
 
@@ -452,9 +453,26 @@ static bool bit_can(enum can_bit_mode mode) {
     
     switch (mode) {
         case CAN_BIT_MODE_BASIC: 
-            LOG_INF("CAN0 state: %d", get_can_state(role_devs->dev_can0));
-            LOG_INF("CAN1 state: %d", get_can_state(role_devs->dev_can1));
-            break;
+            bool ok = true;
+            enum can_state can0_state = get_can_state(role_devs->dev_can0);
+            enum can_state can1_state = get_can_state(role_devs->dev_can1);
+            // test should see if its error-active
+            if (can0_state != CAN_STATE_ERROR_ACTIVE) {
+                LOG_ERR("CAN0 invalid state: %s", can_state_tostr(can0_state));
+                ok = false;
+            }
+
+            if (can1_state != CAN_STATE_ERROR_ACTIVE) {
+                LOG_ERR("CAN1 invalid state: %s", can_state_tostr(can1_state));
+                ok = false;
+            }
+
+            if (ok) {
+                LOG_INF("CAN0\t\tOK");
+                LOG_INF("CAN1\t\tOK");
+            }
+
+            return ok;
         case CAN_BIT_MODE_CONNECTED: 
             bit_can_reset_state();
 
@@ -702,7 +720,7 @@ bool bit_role_specific_basic() {
     ok &= bit_ufirebirdii();
 
 #if defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
-    ok &= bit_can(CAN_BIT_MODE_CONNECTED); // TODO: Changeme
+    ok &= bit_can(CAN_BIT_MODE_BASIC); 
 #endif // device defined CAN0 and CAN1
 
 #endif
