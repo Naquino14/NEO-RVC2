@@ -22,6 +22,7 @@
 #include "sys/storage.h"
 #include "sys/audio.h"
 #include "sys/nrvc2_can.h"
+#include "sys/comms.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -36,11 +37,11 @@ static void button_pressed(const struct device* dev, struct gpio_callback *cb, u
     sw0_ok = true;
 }
 
-static struct lora_modem_config lora_cfg = {
+static struct lora_modem_config modem_cfg = {
     .frequency = MHZ(915),
-    .bandwidth = BW_125_KHZ,
-    .datarate = SF_10,
-    .preamble_len = 8,
+    .bandwidth = BW_500_KHZ,
+    .datarate = LORA_DEFAULT_SF,
+    .preamble_len = LORA_DEFAULT_PREAMBLE_LEN,
     .coding_rate = CR_4_5,
     .iq_inverted = false,
     .public_network = false,
@@ -71,20 +72,40 @@ bool bit_led() {
     return true;
 }
 
+static int shell_bit_lora(const struct shell *shell, size_t argc, char **argv) {
+    ARG_UNUSED(shell);
+
+    if (argc == 1)
+        bit_lora(false);
+    else if (argc == 2 && strncmp("ping", argv[argc - 1], sizeof("ping")) == 0)
+        bit_lora(true);
+    else
+        return 1;
+
+    return 0;
+}
+
 bool bit_lora(bool call_resp) {
     if (role_devs->dev_lora_stat != DEVSTAT_RDY) {
         LOG_WRN("LoRa\t\tSKIP");
         return true;
     }
 
-    lora_cfg.tx = true;
+    int ret = comms_bit_mode(true);
+    if (ret < 0) {
+        LOG_ERR("cannot put comms system in BIT mode: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    modem_cfg.tx = true;
     char call[] = "PING";
     if (!call_resp)
-        lora_cfg.tx_power = 2; // 2dbm
+        modem_cfg.tx_power = 2; // 2dbm
     else
-        lora_cfg.tx_power = LORA_MAX_POW_DBM;
+        modem_cfg.tx_power = LORA_MAX_POW_DBM;
     
-    int ret = lora_config(role_devs->dev_lora, &lora_cfg);
+    ret = lora_config(role_devs->dev_lora, &modem_cfg);
     if (ret < 0) {
         LOG_ERR("LoRa config failed: %d", ret);
         role_devs->dev_lora_stat = DEVSTAT_ERR;
@@ -112,6 +133,13 @@ bool bit_lora(bool call_resp) {
         }
 
         LOG_INF("LoRa Pong received. RSSI: %d, SNR: %d", rssi, snr);
+    }
+
+    ret = comms_bit_mode(false);
+    if (ret < 0) {
+        LOG_ERR("Could not disable BIT mode in comms system: %d", ret);
+        role_devs->dev_lora_stat = DEVSTAT_ERR;
+        return false;
     }
 
     LOG_INF("LoRa\t\tOK");
@@ -758,9 +786,9 @@ void run_bit() {
                 if (!device_is_ready(role_devs->dev_lora)) 
                     printk("Lora device is not ready\n");
         
-                lora_cfg.tx = (role_get() == ROLE_FOB);
+                modem_cfg.tx = (role_get() == ROLE_FOB);
 
-                ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) {
                     printk("Lora config failed: %d\n", ret);
                     break;
@@ -843,8 +871,8 @@ void run_bit() {
                 lora_recv_async(role_devs->dev_lora, NULL, NULL);
                 listening = false;
                 
-                lora_cfg.tx = true; 
-                int ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                modem_cfg.tx = true; 
+                int ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) {
                     printk("Lora rx cb: Set Lora cfg TX failed: %d\n", ret);
                     break;
@@ -858,8 +886,8 @@ void run_bit() {
                     printk("PONG sent successfully.\n");
 
                 k_msleep(100);
-                lora_cfg.tx = false; 
-                ret = lora_config(role_devs->dev_lora, &lora_cfg);
+                modem_cfg.tx = false; 
+                ret = lora_config(role_devs->dev_lora, &modem_cfg);
                 if (ret < 0) 
                     printk("Lora rx cb: Set Lora cfg RX failed: %d\n", ret);
                 
@@ -903,6 +931,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit,
 #endif // CAN and can dev enabled
 
 #endif // TRC
+
+#if defined(CONFIG_LORA) && defined(CONFIG_EN_DEV_LORA)
+    SHELL_CMD(lora, NULL, "Run basic BIT (transmits low power small packet). Runs TX only by default. Use \"bit lora ping\" to test TX and RX.", shell_bit_lora),
+#endif // LORA BIT Submenu
+
     SHELL_SUBCMD_SET_END
 );
 

@@ -3,13 +3,18 @@
 
 #include <errno.h>
 
+/// General
 #define EDEVNOTRDY 2000             /// Device Not Ready
-#define ESTORAGEMOUNTED 2001        /// Storage device already mounted 
-#define ESTORAGENOTMOUNTED 2002     /// Storage device not mounted
+#define ENOINIT 2001                /// System not initialized
 
-#define EKEYREGEN 2100              /// Generic key regen error
-#define ECRYPTO 2101                /// Generic crypto error
-#define ESEQUENCE 2102              /// Sequence number invalid
-#define EAUTH 2103                  /// Invalid tag
+/// Storage
+#define ESTORAGEMOUNTED 2101        /// Storage device already mounted 
+#define ESTORAGENOTMOUNTED 2102     /// Storage device not mounted
+
+/// Security
+#define EKEYREGEN 2200              /// Generic key regen error
+#define ECRYPTO 2201                /// Generic crypto error
+#define ESEQUENCE 2202              /// Sequence number invalid
+#define EAUTH 2203                  /// Invalid tag
 
 #endif // NRVC2_ERRNO_H
