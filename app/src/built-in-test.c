@@ -461,11 +461,13 @@ static bool bit_can(enum can_bit_mode mode) {
             // test should see if its error-active
             if (can0_state != CAN_STATE_ERROR_ACTIVE) {
                 LOG_ERR("CAN0 invalid state: %s", can_state_tostr(can0_state));
+                role_devs->dev_can0_stat = DEVSTAT_ERR;
                 ok = false;
             }
 
             if (can1_state != CAN_STATE_ERROR_ACTIVE) {
                 LOG_ERR("CAN1 invalid state: %s", can_state_tostr(can1_state));
+                role_devs->dev_can1_stat = DEVSTAT_ERR;
                 ok = false;
             }
 

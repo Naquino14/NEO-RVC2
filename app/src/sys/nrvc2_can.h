@@ -3,8 +3,13 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/can.h>
+#include <stdbool.h>
 
-int can_init(const struct device* dev, const char* devname);
+int can_init();
+
+bool can_rdy();
+
+int can_dev_init(const struct device* dev, const char* devname);
 
 enum can_state get_can_state(const struct device* dev);
 

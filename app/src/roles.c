@@ -324,6 +324,17 @@ static bool init_common()
         }
     }
 
+    // CAN
+    {
+        int ret = can_init();
+        if (ret< 0) {
+            LOG_ERR("CAN init failed: %d", ret);
+            rdy = false;
+        }
+
+        LOG_INF("CAN\t\tRDY");
+    }
+
     return rdy;
 }
 
