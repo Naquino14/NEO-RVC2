@@ -156,6 +156,9 @@ int comms_bit_mode(bool bit_running) {
 }
 
 int comms_init() {
+    if (role_devs->dev_lora_stat != DEVSTAT_RDY)
+        return -EDEVNOTRDY;
+
     if (rdy)
         return -EALREADY;
 
