@@ -396,7 +396,7 @@ static bool init_trc_can0() {
         return false;
     }
 
-    ret = can_init(role_devs->dev_can0, "CAN0");
+    ret = can_dev_init(role_devs->dev_can0, "CAN0");
     if (ret < 0) {
         role_devs->dev_can0_stat = DEVSTAT_ERR;        
         return false;
@@ -421,7 +421,7 @@ static bool init_trc_can1() {
         return false;
     }
 
-    ret = can_init(role_devs->dev_can1, "CAN1");
+    ret = can_dev_init(role_devs->dev_can1, "CAN1");
     if (ret < 0) {
         role_devs->dev_can1_stat = DEVSTAT_ERR;        
         return false;
