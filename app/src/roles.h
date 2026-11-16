@@ -54,6 +54,10 @@ typedef struct  {
    const struct device *dev_ufirebirdii;
    devstat_t dev_ufirebirdii_stat;
 
+   const struct device *dev_ledtach;
+   devstat_t dev_ledtach_stat;
+   const size_t dev_ledtach_chainlen;
+
    devstat_t dev_sdcard_stat;
 } role_devs_t;
 

@@ -7,6 +7,7 @@
         sdhc0 = &sdhc_card;
         i2s-tx = &i2s0;
         ufirebirdii = &ufbii_gnss;
+        ledtach = &led_strip;
     };
 
     chosen {

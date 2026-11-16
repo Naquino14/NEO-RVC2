@@ -69,6 +69,12 @@ menu "Installed Devices"
             default y
             help
                 Enable if LED strip Tachometer is installed
+
+        config LEDTACH_MAXBRIGHT
+            int "Maximum brightness 0-255"
+            default 96
+            help
+                Sets the maximum LED Tach Strip brightness
     endif
 endmenu 
 

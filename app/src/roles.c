@@ -9,6 +9,7 @@
 
 #include "sys/nrvc2_can.h"
 #include "sys/comms.h"
+#include "sys/ledtach.h"
 
 const char *FOB_STR = "FOB-COMMANDER-XMTR";
 const char *TRC_STR = "TRACK-CONTROL-XPDR";
@@ -84,6 +85,10 @@ static role_devs_t m_role_devs_fob = {
     .dev_ufirebirdii = NULL,
     .dev_ufirebirdii_stat = DEVSTAT_NOTINSTALLED,
 
+    .dev_ledtach = NULL,
+    .dev_ledtach_stat = DEVSTAT_NOTINSTALLED,
+    .dev_ledtach_chainlen = 0,
+
 #if CONFIG_EN_DEV_SDHC
     .dev_sdcard_stat = DEVSTAT_NOT_RDY,
 #else
@@ -119,6 +124,12 @@ const struct device * const can0 = DEVICE_DT_GET(CAN0_NODE);
 #if CONFIG_EN_DEV_CAN1
 #define CAN1_NODE DT_ALIAS(can1)
 const struct device * const can1 = DEVICE_DT_GET(CAN1_NODE);
+#endif
+
+#if CONFIG_EN_DEV_LEDTACH
+#define LEDTACH_NODE DT_ALIAS(ledtach)
+const struct device * const ledtach = DEVICE_DT_GET(LEDTACH_NODE);
+const size_t ledtach_chainlen = DT_PROP(LEDTACH_NODE, chain_length);
 #endif
 
 static role_devs_t m_role_devs_trc = {
@@ -188,6 +199,16 @@ static role_devs_t m_role_devs_trc = {
 #else
     .dev_ufirebirdii = NULL,
     .dev_ufirebirdii_stat = DEVSTAT_NOTINSTALLED,
+#endif
+
+#if CONFIG_EN_DEV_LEDTACH
+    .dev_ledtach = ledtach,
+    .dev_ledtach_stat = DEVSTAT_NOT_RDY,
+    .dev_ledtach_chainlen = ledtach_chainlen,
+#else
+    .dev_ledtach = NULL,
+    .dev_ledtach_stat = DEVSTAT_NOTINSTALLED,
+    .dev_ledtach_chainlen = 0,
 #endif
 
 #if CONFIG_EN_DEV_SDHC
@@ -422,6 +443,30 @@ static bool init_trc_can1() {
     return true;
 }
 
+static bool init_trc_ledtach() {
+    if (role_devs->dev_ledtach_stat == DEVSTAT_NOTINSTALLED) {
+        LOG_INF("LEDTACH\t\tNOT INSTALLED");
+        return true;
+    }
+
+    int ret = device_is_ready(role_devs->dev_ledtach);
+    if (ret < 0) {
+        LOG_ERR("LEDTACH device is not ready");
+        role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    if (role_devs->dev_ledtach_chainlen < 1) {
+        LOG_ERR("LEDTACH chain length prop must be nonzero");
+        role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    LOG_INF("LEDTACH\t\tRDY");
+
+    return true;
+}
+
 static bool init_trc() {
     bool rdy = true;
 
@@ -439,6 +484,8 @@ static bool init_trc() {
 
     rdy &= init_trc_can0();
     rdy &= init_trc_can1();
+
+    rdy &= init_trc_ledtach();
 
     return rdy;
 }
@@ -502,10 +549,12 @@ static int shell_role_status(const struct shell *shell, size_t argc, char **argv
     LOG_INF("I2S\t\t%s", devstat_to_str(role_devs->dev_i2s_stat));
     LOG_INF("UFBII\t\t%s", devstat_to_str(role_devs->dev_ufirebirdii_stat));
     LOG_INF("SDHC\t\t%s", devstat_to_str(role_devs->dev_sdcard_stat));
+    LOG_INF("LEDTACH\t\t%s", devstat_to_str(role_devs->dev_ledtach_stat));
 
     LOG_INF("--- Systems status ---");
     LOG_INF("SECURITY\t%s", nrvc2_security_rdy() ? "RDY" : "NOT RDY");
     LOG_INF("COMMS\t\t%s", comms_rdy() ? "RDY" : "NOT RDY");
+    LOG_INF("LEDTACH\t\t%s", ledtach_rdy() ? "RDY" : "NOT RDY");
 
     return 0;
 }
