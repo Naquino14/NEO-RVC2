@@ -72,6 +72,7 @@ bool bit_led() {
     return true;
 }
 
+#if defined(CONFIG_EN_DEV_LORA)
 static int shell_bit_lora(const struct shell *shell, size_t argc, char **argv) {
     ARG_UNUSED(shell);
 
@@ -84,6 +85,7 @@ static int shell_bit_lora(const struct shell *shell, size_t argc, char **argv) {
 
     return 0;
 }
+#endif
 
 bool bit_lora(bool call_resp) {
     if (role_devs->dev_lora_stat != DEVSTAT_RDY) {

@@ -64,8 +64,6 @@ static void uc6580_rx_work_handler(struct k_work* work) {
 }
 
 static int uc6580_init(const struct device* dev) {
-    LOG_INF("Initializing UC6580");
-
     struct uc6580_data* data = dev->data;
     const struct uc6580_config* cfg = dev->config;
 
@@ -107,12 +105,15 @@ static int uc6580_init(const struct device* dev) {
 }
 
 static int uc6580_start(const struct device* dev) {
-    LOG_INF("START!");
+    uart_irq_rx_enable(((struct uc6580_config*)dev->config)->uart);
+    // future: wake uc6580
     return 0;
 }
 
 static int uc6580_stop(const struct device* dev) {
-    LOG_INF("STOP!");
+    uart_irq_rx_disable(((struct uc6580_config*)dev->config)->uart);
+    ((struct uc6580_data*)dev->data)->last_fix.valid = false; // immediately invalidate
+    // future: tell the uc6580 to sleep
     return 0;
 }
 

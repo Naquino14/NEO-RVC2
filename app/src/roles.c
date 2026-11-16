@@ -311,14 +311,17 @@ static bool init_common()
     }
 
     // Comms
-    {
+    // requires lora to be ready to configure modem
+    if (role_devs->dev_lora_stat != DEVSTAT_RDY)
+        LOG_INF("COMMS\t\tDISABLED");
+    else {
         int ret = comms_init();
+        
         if (ret < 0) {
             LOG_ERR("Comms init failed: %d", ret);
             rdy = false;
+            LOG_INF("COMMS\t\tRDY");
         }
-
-        LOG_INF("COMMS\t\tRDY");
     }
 
     return rdy;
