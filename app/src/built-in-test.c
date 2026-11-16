@@ -23,6 +23,7 @@
 #include "sys/audio.h"
 #include "sys/nrvc2_can.h"
 #include "sys/comms.h"
+#include "sys/ledtach.h"
 
 LOG_MODULE_REGISTER(bit, LOG_LEVEL_DBG);
 
@@ -385,6 +386,60 @@ static int shell_bit_ufirebirdii(const struct shell *shell, size_t argc, char **
     return bit_ufirebirdii() ? 0 : -1;
 }
 
+static bool bit_ledtach() {
+    if (role_devs->dev_ledtach_stat != DEVSTAT_RDY) {
+        LOG_WRN("LEDTACH\t\tSKIP");
+        return true;
+    }
+
+    int ret;
+
+    const struct led_rgb colors[] = { RGB(84, 215, 255), RGB(245, 145, 5), RGB(240, 22, 58), RGB(160, 0, 250) };
+    for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++) {
+        struct led_rgb color = colors[SCALE(i, 3)];
+
+        ret = ledtach_pix_set(i, color);
+        if (ret < 0) {
+            LOG_ERR("Error setting LEDTACH pixel: %d", ret);
+            role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+            return false;
+        }
+
+        ret = ledtach_flush();
+        if (ret < 0) {
+            LOG_ERR("Could not flush LEDTACH buffer: %d", ret);
+            role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+            return false;
+        }
+
+        k_msleep(50);
+    }
+
+    // tests done, stunt on it
+    for (int m = 0; m < 3; m++) {
+        for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++)
+            ledtach_pix_set(i, colors[3]);
+        ledtach_flush();
+        k_msleep(100);
+
+        for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++)
+            ledtach_pix_set(i, colors[3]);
+        ledtach_flush();
+        k_msleep(100);
+    }
+
+    for (int i = role_devs->dev_ledtach_chainlen; i >= 0; i--) {
+        struct led_rgb color = colors[SCALE(i, 3)];
+
+        ledtach_pix_set(i, color);
+        ledtach_flush();
+        k_msleep(50);
+    }
+    
+    LOG_INF("LEDTACH\t\tOK");
+    return true;
+}
+
 #if defined(CONFIG_CAN) && defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
 
 enum can_bit_mode {
@@ -703,6 +758,8 @@ bool bit_role_specific_basic() {
 
     ok &= bit_ufirebirdii();
 
+    ok &= bit_ledtach();
+
 #if defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
     ok &= bit_can(CAN_BIT_MODE_CONNECTED); // TODO: Changeme
 #endif // device defined CAN0 and CAN1
@@ -937,6 +994,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit,
 #if defined(CONFIG_LORA) && defined(CONFIG_EN_DEV_LORA)
     SHELL_CMD(lora, NULL, "Run basic BIT (transmits low power small packet). Runs TX only by default. Use \"bit lora ping\" to test TX and RX.", shell_bit_lora),
 #endif // LORA BIT Submenu
+
+#if defined(CONFIG_LED_STRIP) && defined(CONFIG_EN_DEV_LEDTACH)
+#endif // LEDTACH BIT Submenu
 
     SHELL_SUBCMD_SET_END
 );

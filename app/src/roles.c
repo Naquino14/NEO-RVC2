@@ -449,9 +449,15 @@ static bool init_trc_ledtach() {
         return true;
     }
 
-    int ret = device_is_ready(role_devs->dev_ledtach);
-    if (ret < 0) {
+    if (!device_is_ready(role_devs->dev_ledtach)) {
         LOG_ERR("LEDTACH device is not ready");
+        role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    const struct device * const i2s1 = DEVICE_DT_GET(DT_NODELABEL(i2s1));
+    if (!device_is_ready(i2s1)) {
+        LOG_ERR("LEDTACH I2S DMA is not ready");
         role_devs->dev_ledtach_stat = DEVSTAT_ERR;
         return false;
     }
@@ -462,6 +468,14 @@ static bool init_trc_ledtach() {
         return false;
     }
 
+    int ret = ledtach_init();
+    if (ret < 0) {
+        LOG_ERR("Failed to init LEDTACH SYS: %d", ret);
+        role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+        return false;
+    }
+
+    role_devs->dev_ledtach_stat = DEVSTAT_RDY;
     LOG_INF("LEDTACH\t\tRDY");
 
     return true;
