@@ -129,7 +129,7 @@ static void uart_printf(char* buf, size_t buflen, const char* fmt, ...) {
 }
 
 // format compatible with adamtheone/canDrive
-static int fmt_frame(const struct can_frame *f, char *out, size_t sz) {
+static int fmt_frame(const struct can_frame* f, char* out, size_t sz) {
     bool ide = f->flags & CAN_FRAME_IDE, rtr = f->flags & CAN_FRAME_RTR;
     int n = snprintf(out, sz, ide ? "%08X,%02X,%02X," : "%04X,%02X,%02X,", (unsigned)f->id, rtr, ide);
     for (int i = 0; !rtr && i < can_dlc_to_bytes(f->dlc); i++)
@@ -139,9 +139,114 @@ static int fmt_frame(const struct can_frame *f, char *out, size_t sz) {
     return n;
 }
 
+static int hexval(char c) {
+    if (c >= '0' && c <= '9') 
+        return c - '0';
+    if (c >= 'A' && c <= 'F') 
+        return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') 
+        return c - 'a' + 10;
+    return -1;
+}
+
+// reads hex digits up to ',' or end; returns digit count, or -1 if invalid
+static int hex_field(const char** p, const char* end, uint32_t* out, int max) {
+    int n = 0; 
+    uint32_t v = 0;
+    while (*p < end && **p != ',') {
+        int h = hexval(**p);
+        if (h < 0 || n >= max) 
+            return -1;
+        v = (v << 4) | h; n++; 
+        (*p)++;
+    }
+    *out = v;
+    return n ? n : -1;
+}
+
+static int dec_frame(struct can_frame* f, const char *in, size_t sz) {
+    const char* p = in;
+    const char* end = in + sz;
+    uint32_t id, rtr, ide;
+    memset(f, 0, sizeof(struct can_frame));
+
+    if (hex_field(&p, end, &id, 8)  < 0 || p >= end || *p++ != ',') 
+        return -EINVAL;
+    if (hex_field(&p, end, &rtr, 2) < 0 || p >= end || *p++ != ',') 
+        return -EINVAL;
+    if (hex_field(&p, end, &ide, 2) < 0 || p >= end || *p++ != ',') 
+        return -EINVAL;
+    if (rtr > 1 || ide > 1) 
+        return -EINVAL;
+
+    uint8_t n = 0;
+    while (p + 1 < end && hexval(*p) >= 0) {
+        int lo = hexval(p[1]);
+        if (lo < 0 || n == CAN_MAX_DLEN) 
+            return -EINVAL;
+        f->data[n++] = (hexval(p[0]) << 4) | lo;
+        p += 2;
+    }
+
+    if (p < end && *p != '\n' && *p != '\r' && *p != '\0') 
+        return -EINVAL;
+
+    if (ide) { 
+        if (id > CAN_EXT_ID_MASK) 
+            return -EINVAL; 
+        f->flags |= CAN_FRAME_IDE; 
+    }
+    else if (id > CAN_STD_ID_MASK) 
+        return -EINVAL;
+    
+    if (rtr) { 
+        if (n) 
+            return -EINVAL; 
+        f->flags |= CAN_FRAME_RTR; 
+    }
+
+    f->id = id; f->dlc = n;
+    return 0;
+}
+
+#define READER_THREAD_STACK_SIZE 2048 // CHANGEME
+#define READER_THREAD_PRIORITY 6
+static K_THREAD_STACK_DEFINE(reader_thread_stack, READER_THREAD_STACK_SIZE);
+struct k_thread reader_thread;
+
+static void reader_thread_ep(void*, void*, void*) {
+    char line[64];
+    int idx = 0;
+    struct can_frame frame;
+    char c;
+    const struct device* uart = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+
+    for (;;) {
+        if (idx + 1 >= sizeof(line)) {
+            // discard line
+            idx = 0;
+            continue;
+        }
+        if (uart_poll_in(uart, &c) == 0) {
+            line[idx++] = c;
+        } else {
+            k_msleep(2);
+            continue; 
+        }
+
+        if (c == '\n') {
+            line[idx] = '\0';
+            if (dec_frame(&frame, line, idx + 1) == 0)
+                can_send(role_devs->dev_can0, &frame, K_FOREVER, NULL, NULL);
+            
+            idx = 0;
+        }
+    }
+}
+
 CAN_MSGQ_DEFINE(sniff_q, 64);
 
-#define SNIFFER_THREAD_STACK_SIZE 2048
+#define SNIFFER_THREAD_STACK_SIZE 2048 // CHANGEME
 #define SNIFFER_THREAD_PRIORITY 5
 // static void sniffer_thread_ep(void*, void*, void*);
 static K_THREAD_STACK_DEFINE(sniffer_thread_stack, SNIFFER_THREAD_STACK_SIZE);
@@ -251,6 +356,10 @@ static void en_can_sniffer(struct k_work* work) {
     k_thread_create(&sniffer_thread, sniffer_thread_stack, K_THREAD_STACK_SIZEOF(sniffer_thread_stack),
         sniffer_thread_ep, NULL, NULL, NULL, 
         SNIFFER_THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    k_thread_create(&reader_thread, reader_thread_stack, K_THREAD_STACK_SIZEOF(reader_thread_stack),
+        reader_thread_ep, NULL, NULL, NULL,
+        READER_THREAD_PRIORITY, 0, K_NO_WAIT);
 }
 
 static int shell_can_sniffer(const struct shell* shell, size_t argc, char** argv) {
