@@ -394,15 +394,17 @@ static bool bit_ledtach() {
 
     int ret;
 
-    const struct led_rgb colors[] = { RGB(84, 215, 255), RGB(245, 145, 5), RGB(240, 22, 58), RGB(160, 0, 250) };
+    const struct led_rgb colors[] = { RGB(84, 215, 255), RGB(245, 145, 5), RGB(255, 7, 14), RGB(233, 194, 255) };
     for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++) {
-        struct led_rgb color = colors[SCALE(i, 3)];
+        struct led_rgb color = colors[(3 * i) / role_devs->dev_ledtach_chainlen];
 
-        ret = ledtach_pix_set(i, color);
-        if (ret < 0) {
-            LOG_ERR("Error setting LEDTACH pixel: %d", ret);
-            role_devs->dev_ledtach_stat = DEVSTAT_ERR;
-            return false;
+        for (int j = 0; j < i; j++) {
+            ret = ledtach_pix_set(j, color);
+            if (ret < 0) {
+                LOG_ERR("Error setting LEDTACH pixel: %d", ret);
+                role_devs->dev_ledtach_stat = DEVSTAT_ERR;
+                return false;
+            }
         }
 
         ret = ledtach_flush();
@@ -412,7 +414,7 @@ static bool bit_ledtach() {
             return false;
         }
 
-        k_msleep(50);
+        k_msleep(37);
     }
 
     // tests done, stunt on it
@@ -420,24 +422,38 @@ static bool bit_ledtach() {
         for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++)
             ledtach_pix_set(i, colors[3]);
         ledtach_flush();
-        k_msleep(100);
+        k_msleep(50);
 
         for (int i = 0; i < role_devs->dev_ledtach_chainlen; i++)
-            ledtach_pix_set(i, colors[3]);
-        ledtach_flush();
-        k_msleep(100);
-    }
-
-    for (int i = role_devs->dev_ledtach_chainlen; i >= 0; i--) {
-        struct led_rgb color = colors[SCALE(i, 3)];
-
-        ledtach_pix_set(i, color);
+            ledtach_pix_set(i, colors[2]);
         ledtach_flush();
         k_msleep(50);
     }
     
+    struct led_rgb black = RGB(0, 0, 0);
+    for (int i = role_devs->dev_ledtach_chainlen; i >= 0; i--) {
+        struct led_rgb color = colors[(3 * i) / role_devs->dev_ledtach_chainlen];
+
+        for (int j = i; j >= 0; j--)
+            ledtach_pix_set(j, color);
+
+        for (int j = i; j < role_devs->dev_ledtach_chainlen; j++)
+            ledtach_pix_set(i, black);
+
+        ledtach_flush();
+        k_msleep(37);
+    }
+    
     LOG_INF("LEDTACH\t\tOK");
     return true;
+}
+
+static int shell_bit_ledtach(const struct shell* shell, size_t argc, char** argv) {
+    (void)shell;
+    (void)argc;
+    (void)argv;
+
+    return bit_ledtach() ? 0 : -1;
 }
 
 #if defined(CONFIG_CAN) && defined(CONFIG_EN_DEV_CAN0) && defined(CONFIG_EN_DEV_CAN1)
@@ -996,6 +1012,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bit,
 #endif // LORA BIT Submenu
 
 #if defined(CONFIG_LED_STRIP) && defined(CONFIG_EN_DEV_LEDTACH)
+    SHELL_CMD(ledtach, NULL, "Run led tachometer test.", shell_bit_ledtach),
 #endif // LEDTACH BIT Submenu
 
     SHELL_SUBCMD_SET_END

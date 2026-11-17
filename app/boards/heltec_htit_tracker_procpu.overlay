@@ -54,7 +54,7 @@
     pinctrl-0 = <&i2s1_default>;
     pinctrl-names = "default";
 
-    dmas = <&dma 2>;
+    dmas = <&dma 5>;
     dma-names = "tx";
 
     led_strip: ws2812@0 {
